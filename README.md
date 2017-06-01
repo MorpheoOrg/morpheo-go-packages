@@ -67,4 +67,5 @@ fork) under another licence.
 
 Maintainers
 -----------
+* Max-Pol Le Brun <maxpol@morpheo.co>
 * Étienne Lafarge <etienne@rythm.co>

@@ -34,3 +34,7 @@ import:
   - client
   - api/types
 
+# Tools for tests
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
