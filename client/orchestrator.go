@@ -42,7 +42,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/MorpheoOrg/go-morpheo/common"
+	"github.com/MorpheoOrg/go-packages/common"
 	uuid "github.com/satori/go.uuid"
 )
 

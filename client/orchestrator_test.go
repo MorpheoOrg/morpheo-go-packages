@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/MorpheoOrg/go-morpheo/client"
-	"github.com/MorpheoOrg/go-morpheo/common"
+	"github.com/MorpheoOrg/go-packages/client"
+	"github.com/MorpheoOrg/go-packages/common"
 	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 )
