@@ -32,6 +32,7 @@
  * The fact that you are presently reading this means that you have had
  * knowledge of the CeCILL license and that you accept its terms.
  */
+
 package client
 
 import (
@@ -123,7 +124,7 @@ func (o *OrchestratorAPI) postData(route string, upletID uuid.UUID, data io.Read
 func (o *OrchestratorAPI) PostLearnResult(learnupletID uuid.UUID, perfuplet Perfuplet) error {
 	dataBytes, err := json.Marshal(perfuplet)
 	if err != nil {
-		return fmt.Errorf("Error marshaling perfuplet to JSON: %s", perfuplet)
+		return fmt.Errorf("Error marshaling perfuplet to JSON: %+v", perfuplet)
 	}
 	data := bytes.NewReader(dataBytes)
 	return o.postData(OrchestratorLearnResultRoute, learnupletID, data)
@@ -156,7 +157,7 @@ func (o *OrchestratorAPIMock) UpdateUpletStatus(upletType, status string, upletI
 // PostLearnResult returns nil except if OrchestratorAPIMock.UnexistingUpletID is passed
 func (o *OrchestratorAPIMock) PostLearnResult(learnupletID uuid.UUID, perfuplet Perfuplet) error {
 	if learnupletID.String() != o.UnexistingUplet {
-		log.Printf("[orchestrator-mock] Received learn result for learn-uplet %s: \n %s", learnupletID, perfuplet)
+		log.Printf("[orchestrator-mock] Received learn result for learn-uplet %s: \n %+v", learnupletID, perfuplet)
 		return nil
 	}
 	return fmt.Errorf("[orchestrator-mock][status-update] Unexisting uplet %s", learnupletID)

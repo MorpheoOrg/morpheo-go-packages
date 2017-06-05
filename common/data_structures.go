@@ -189,7 +189,7 @@ func (u *LearnUplet) Check() (err error) {
 
 // APIError wraps errors sent back by the HTTP API
 type APIError struct {
-	Message string `json:"string"`
+	Message string `json:"error"`
 }
 
 // NewAPIError creates an APIError object, given an error message
@@ -327,8 +327,7 @@ func (d *Data) Check() error {
 	return nil
 }
 
-// POST REQUESTS STORAGE
-// PostFormFields gathers the valid form fields of a POST multipart/form-data request 
+// MultipartFormFields gathers the valid form fields of a POST multipart/form-data request
 type MultipartFormFields struct {
 	Description string
 	Name        string
@@ -356,5 +355,5 @@ func CheckFormFields(blobType string, mff *MultipartFormFields) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("Invalid blobType in CheckFormFields().")
+	return fmt.Errorf("Invalid blobType in CheckFormFields()")
 }
