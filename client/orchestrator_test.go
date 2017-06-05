@@ -73,7 +73,7 @@ func TestUpletUpdateBadHTTPStatus(t *testing.T) {
 }
 
 type statuplet struct {
-	status string `json:"status"`
+	status string
 }
 
 func orchestratorAPIUpdateMock(t *testing.T, statusCode int) (testServer *httptest.Server, apiClient client.Orchestrator) {

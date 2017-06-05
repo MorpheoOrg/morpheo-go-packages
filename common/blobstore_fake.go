@@ -36,49 +36,50 @@
 package common
 
 import (
+	"bytes"
+	"fmt"
 	"io"
-	"os"
-	"path/filepath"
+	"io/ioutil"
+	"strings"
 )
 
-// LocalBlobStore is a BlobStore implementations that stores data on the local hard drive
-type LocalBlobStore struct {
-	DataDir string
+// This little perverts make Put and Get calls fail
+const (
+	NaughtySize      = 69
+	ViciousDevilUUID = "66666666-6969-6969-6969-666666666666"
+)
+
+// FakeBlobStore is a BlobStore implementations for tests
+type FakeBlobStore struct {
 }
 
-// NewLocalBlobStore creates a new local Blobstore given a data directory
-func NewLocalBlobStore(dataDir string) (BlobStore, error) {
-	return &LocalBlobStore{
-		DataDir: dataDir,
-	}, nil
+// NewFakeBlobStore creates a new Blobstore for tests
+func NewFakeBlobStore(dataDir string) (BlobStore, error) {
+	if dataDir == "evil" {
+		return nil, fmt.Errorf("[fake-blobstore] Evil blobStore")
+	}
+	return &FakeBlobStore{}, nil
 }
 
 // Put writes a file in the data directory (and creates necessarry sub-directories if there are
 // forward slashes in the key name)
-func (s *LocalBlobStore) Put(key string, data io.Reader, size int64) error {
-	datapath := filepath.Join(s.DataDir, key)
-
-	parent := filepath.Dir(datapath)
-	_, err := os.Stat(parent)
-	if os.IsNotExist(err) {
-		err := os.MkdirAll(parent, 0644)
-		if err != nil {
-			return err
-		}
+func (s *FakeBlobStore) Put(key string, data io.Reader, size int64) error {
+	if size == NaughtySize {
+		return fmt.Errorf("[fake-blobstore] What a naughty size")
 	}
-
-	file, err := os.Create(datapath)
-	defer file.Close()
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(file, data)
-	return err
+	return nil
 }
 
 // Get returns an io.ReadCloser on the data living under the provided key. The retriever must
 // explicitely call the Close() method on it when he's done reading.
-func (s *LocalBlobStore) Get(key string) (data io.ReadCloser, err error) {
-	datapath := filepath.Join(s.DataDir, key)
-	return os.Open(datapath)
+func (s *FakeBlobStore) Get(key string) (data io.ReadCloser, err error) {
+	// Check if uuid (end of key) is the ViciousDevilUUID
+	if strings.SplitAfter(key, "/")[1] == ViciousDevilUUID {
+		return nil, fmt.Errorf("[fake-blobstore] Runnin' With the Devil")
+	}
+	return fakeFile(), nil
+}
+
+func fakeFile() io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewBuffer([]byte("fakeFileContent")))
 }
