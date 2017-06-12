@@ -227,13 +227,13 @@ func (e *FatalTaskError) Error() string {
 
 // Blob defines an abstract blob of data
 type Blob struct {
-	ID        uuid.UUID `json:"uuid" db:"uuid"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID              uuid.UUID `json:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
 }
 
 func (b *Blob) fillNewBlob() {
 	b.ID = uuid.NewV4()
-	b.CreatedAt = time.Now()
+	b.TimestampUpload = int32(time.Now().Unix())
 }
 
 // Problem defines a problem blob (should be a .tar.gz containing a Dockerfile)
