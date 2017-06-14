@@ -326,3 +326,35 @@ func (d *Data) Check() error {
 	// TODO: check what should be
 	return nil
 }
+
+// POST REQUESTS STORAGE
+// PostFormFields gathers the valid form fields of a POST multipart/form-data request 
+type MultipartFormFields struct {
+	Description string
+	Name        string
+	Size        int64
+}
+
+// CheckFormFields checks if the PostFormFields are correct for the given blobType
+func CheckFormFields(blobType string, mff *MultipartFormFields) error {
+	switch blobType {
+	case "problem":
+		if mff.Name != "" {
+			return fmt.Errorf("Invalid form: 'name' is not a valid field for Problem")
+		}
+		if mff.Description == "" || mff.Size == 0 {
+			return fmt.Errorf("Invalid form: 'size' and 'description' fields should be non-empty and sent before blob")
+		}
+		return nil
+
+	case "algo":
+		if mff.Description != "" {
+			return fmt.Errorf("Invalid form: 'description' is not a valid field for algo")
+		}
+		if mff.Name == "" || mff.Size == 0 {
+			return fmt.Errorf("Invalid form: 'size' and 'name' fields should be non-empty and sent before blob")
+		}
+		return nil
+	}
+	return fmt.Errorf("Invalid blobType in CheckFormFields().")
+}
