@@ -37,8 +37,9 @@ package common
 
 import (
 	"fmt"
-	"github.com/satori/go.uuid"
 	"time"
+
+	"github.com/satori/go.uuid"
 )
 
 // Uplet types
@@ -132,6 +133,7 @@ type LearnUplet struct {
 
 	ID             uuid.UUID   `json:"uuid"`
 	Problem        uuid.UUID   `json:"problem"`
+	Workflow       uuid.UUID   `json:"workflow"`
 	TrainData      []uuid.UUID `json:"train_data"`
 	TestData       []uuid.UUID `json:"test_data"`
 	Algo           uuid.UUID   `json:"algo"`
@@ -156,6 +158,10 @@ func (u *LearnUplet) Check() (err error) {
 
 	if uuid.Equal(uuid.Nil, u.Problem) {
 		return fmt.Errorf("problem field is required")
+	}
+
+	if uuid.Equal(uuid.Nil, u.Workflow) {
+		return fmt.Errorf("workflow field is required")
 	}
 
 	if uuid.Equal(uuid.Nil, u.Algo) {
