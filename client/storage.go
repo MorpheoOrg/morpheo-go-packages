@@ -141,7 +141,14 @@ func (s *StorageAPI) postObjectBlob(prefix string, id uuid.UUID, dataReader io.R
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("[storage-api] Bad status code (%s) performing streaming POST request against %s", resp.Status, url)
+		var apiError common.APIError
+		var errorMessage string
+		err = json.NewDecoder(resp.Body).Decode(&apiError)
+		if err != nil {
+			errorMessage = "Unable to decode error message"
+		}
+		errorMessage = apiError.Message
+		return fmt.Errorf("[storage-api] Bad status code (%s) performing streaming POST request against %s: %s", resp.Status, url, errorMessage)
 	}
 
 	return nil
