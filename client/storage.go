@@ -66,10 +66,10 @@ type Storage interface {
 	GetAlgoBlob(id uuid.UUID) (algoReader io.ReadCloser, err error)
 	GetModelBlob(id uuid.UUID) (modelReader io.ReadCloser, err error)
 	GetProblemWorkflowBlob(id uuid.UUID) (problemReader io.ReadCloser, err error)
-	PostData(id uuid.UUID, dataReader io.Reader) error
-	PostAlgo(id uuid.UUID, algoReader io.Reader) error
-	PostModel(model *common.Model, algoReader io.Reader) error
-	PostProblemWorkflow(id uuid.UUID, problemReader io.Reader) error
+	PostData(id uuid.UUID, dataReader io.Reader, size int64) error
+	PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error
+	PostModel(model *common.Model, algoReader io.Reader, size int64) error
+	PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error
 }
 
 // StorageAPI is a wrapper around our storage HTTP API
@@ -127,14 +127,18 @@ func (s *StorageAPI) getAndParseJSONObject(objectRoute string, objectID uuid.UUI
 	return nil
 }
 
-func (s *StorageAPI) postObjectBlob(prefix string, id uuid.UUID, dataReader io.Reader) error {
+func (s *StorageAPI) postObjectBlob(prefix string, id uuid.UUID, dataReader io.Reader, size int64) error {
 	url := fmt.Sprintf("http://%s:%d/%s", s.Hostname, s.Port, prefix)
 
 	req, err := http.NewRequest(http.MethodPost, url, dataReader)
 	if err != nil {
 		return fmt.Errorf("[storage-api] Error building streaming POST request against %s: %s", url, err)
 	}
+
+	// Add required headers
 	req.SetBasicAuth(s.User, s.Password)
+	req.ContentLength = size
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("[storage-api] Error performing streaming POST request against %s: %s", url, err)
@@ -148,7 +152,7 @@ func (s *StorageAPI) postObjectBlob(prefix string, id uuid.UUID, dataReader io.R
 			errorMessage = "Unable to decode error message"
 		}
 		errorMessage = apiError.Message
-		return fmt.Errorf("[storage-api] Bad status code (%s) performing streaming POST request against %s: %s", resp.Status, url, errorMessage)
+		return fmt.Errorf("[storage-api] Bad status code (%s) performing streaming POST request against %s -- API Error: %s", resp.Status, url, errorMessage)
 	}
 
 	return nil
@@ -213,28 +217,28 @@ func (s *StorageAPI) GetDataBlob(id uuid.UUID) (dataReader io.ReadCloser, err er
 
 // PostProblemWorkflow returns an io.ReadCloser to a problem workflow image (a .tar.gz file on the
 // image's build context)
-func (s *StorageAPI) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader) error {
-	return s.postObjectBlob(StorageProblemWorkflowRoute, id, problemReader)
+func (s *StorageAPI) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error {
+	return s.postObjectBlob(StorageProblemWorkflowRoute, id, problemReader, size)
 }
 
 // PostAlgo returns an io.ReadCloser to a algo image
-func (s *StorageAPI) PostAlgo(id uuid.UUID, algoReader io.Reader) error {
-	return s.postObjectBlob(StorageAlgoRoute, id, algoReader)
+func (s *StorageAPI) PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error {
+	return s.postObjectBlob(StorageAlgoRoute, id, algoReader, size)
 }
 
 // PostModel returns an io.ReadCloser to a model
-func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader) error {
+func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size int64) error {
 	// Check for associated Algo existence
 	if _, err := s.GetAlgo(model.Algo); err != nil {
 		return fmt.Errorf("Algorithm %s associated to posted model wasn't found", model.Algo)
 	}
 
-	return s.postObjectBlob(fmt.Sprintf("%s?algo=%s", StorageModelRoute, model.Algo), model.ID, modelReader)
+	return s.postObjectBlob(fmt.Sprintf("%s?algo=%s", StorageModelRoute, model.Algo), model.ID, modelReader, size)
 }
 
 // PostData returns an io.ReadCloser to a data image
-func (s *StorageAPI) PostData(id uuid.UUID, dataReader io.Reader) error {
-	return s.postObjectBlob(StorageDataRoute, id, dataReader)
+func (s *StorageAPI) PostData(id uuid.UUID, dataReader io.Reader, size int64) error {
+	return s.postObjectBlob(StorageDataRoute, id, dataReader, size)
 }
 
 // StorageAPIMock is a mock of the storage API (for tests & local dev. purposes)
@@ -283,19 +287,25 @@ func (s *StorageAPIMock) GetProblemWorkflow(id uuid.UUID) (dataReader io.ReadClo
 }
 
 // PostData forwards the given reader data bytes... to /dev/null AHAHAHAH !
-func (s *StorageAPIMock) PostData(id uuid.UUID, dataReader io.Reader) error {
+func (s *StorageAPIMock) PostData(id uuid.UUID, dataReader io.Reader, size int64) error {
 	_, err := io.Copy(ioutil.Discard, dataReader)
 	return err
 }
 
 // PostAlgo sends an algorithm... to oblivion
-func (s *StorageAPIMock) PostAlgo(id uuid.UUID, algoReader io.Reader) error {
+func (s *StorageAPIMock) PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error {
 	_, err := io.Copy(ioutil.Discard, algoReader)
 	return err
 }
 
 // PostProblemWorkflow fills the universe with one more problem, but the universe doesn't care
-func (s *StorageAPIMock) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader) error {
+func (s *StorageAPIMock) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error {
 	_, err := io.Copy(ioutil.Discard, problemReader)
+	return err
+}
+
+// PostModel sends a model... to Oblivion
+func (s *StorageAPIMock) PostModel(id uuid.UUID, modelReader io.Reader, size int64) error {
+	_, err := io.Copy(ioutil.Discard, modelReader)
 	return err
 }
