@@ -59,7 +59,6 @@ var (
 // Task statuses
 const (
 	TaskStatusTodo    = "todo"
-	TaskStatusWaiting = "waiting"
 	TaskStatusPending = "pending"
 	TaskStatusDone    = "done"
 	TaskStatusFailed  = "failed"
@@ -69,7 +68,6 @@ var (
 	// ValidStatuses is a set of all possible values for the "status" field
 	ValidStatuses = map[string]struct{}{
 		TaskStatusTodo:    struct{}{},
-		TaskStatusWaiting: struct{}{},
 		TaskStatusPending: struct{}{},
 		TaskStatusDone:    struct{}{},
 		TaskStatusFailed:  struct{}{},

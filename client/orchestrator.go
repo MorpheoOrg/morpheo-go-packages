@@ -49,7 +49,7 @@ import (
 
 // Orchestrator HTTP API routes
 const (
-	OrchestratorStatusUpdateRoute = "/update_status"
+	OrchestratorStatusUpdateRoute = "/worker"
 	OrchestratorLearnResultRoute  = "/learndone"
 	OrchestratorPredResultRoute   = "/preddone"
 )
@@ -86,7 +86,16 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 	if _, ok := common.ValidStatuses[status]; !ok {
 		return fmt.Errorf("[orchestrator-api] Status \"%s\" is invalid. Allowed values are %s", status, common.ValidStatuses)
 	}
-	url := fmt.Sprintf("http://%s:%d%s/%s/%s", o.Hostname, o.Port, OrchestratorStatusUpdateRoute, upletType, upletID)
+
+	// TODO (orchestrator): make the orchestrator API RESTFul and get rid of this dirty logic
+	var url string
+	if status == common.TaskStatusPending {
+		url = fmt.Sprintf("http://%s:%d%s/%s/%s", o.Hostname, o.Port, OrchestratorStatusUpdateRoute, upletType, upletID)
+	} else if status == common.TaskStatusFailed {
+		url = fmt.Sprintf("http://%s:%d/%s/%s", o.Hostname, o.Port, upletType, upletID)
+	} else {
+		return fmt.Errorf("[orchestrator-api] Status Update Error on %s %s: for now, only %s and %s statuses are supported", upletType, upletID, common.TaskStatusPending, common.TaskStatusFailed)
+	}
 
 	payload, _ := json.Marshal(map[string]string{"status": status})
 
@@ -95,6 +104,7 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 		return fmt.Errorf("[orchestrator-api] Error building result POST request against %s: %s", url, err)
 	}
 	req.SetBasicAuth(o.User, o.Password)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -107,7 +117,7 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 	return nil
 }
 
-func (o *OrchestratorAPI) postData(route string, upletID uuid.UUID, data io.Reader) error {
+func (o *OrchestratorAPI) postJSONData(route string, upletID uuid.UUID, data io.Reader) error {
 	url := fmt.Sprintf("http://%s:%d%s/%s", o.Hostname, o.Port, route, upletID)
 
 	req, err := http.NewRequest(http.MethodPost, url, data)
@@ -115,6 +125,7 @@ func (o *OrchestratorAPI) postData(route string, upletID uuid.UUID, data io.Read
 		return fmt.Errorf("[orchestrator-api] Error building result POST request against %s: %s", url, err)
 	}
 	req.SetBasicAuth(o.User, o.Password)
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -134,7 +145,7 @@ func (o *OrchestratorAPI) PostLearnResult(learnupletID uuid.UUID, perfuplet Perf
 		return fmt.Errorf("Error marshaling perfuplet to JSON: %+v", perfuplet)
 	}
 	data := bytes.NewReader(dataBytes)
-	return o.postData(OrchestratorLearnResultRoute, learnupletID, data)
+	return o.postJSONData(OrchestratorLearnResultRoute, learnupletID, data)
 }
 
 // OrchestratorAPIMock mocks the Orchestrator API, always returning ok to update queries except for

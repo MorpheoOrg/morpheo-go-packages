@@ -26,7 +26,7 @@ func TestUpletUpdateNormal(t *testing.T) {
 	ts, apiClient := orchestratorAPIUpdateMock(t, http.StatusOK)
 	defer ts.Close()
 
-	err := apiClient.UpdateUpletStatus(common.TypeLearnUplet, common.TaskStatusDone, uuid.NewV4())
+	err := apiClient.UpdateUpletStatus(common.TypeLearnUplet, common.TaskStatusPending, uuid.NewV4())
 	assert.Nil(t, err)
 }
 
