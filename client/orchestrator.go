@@ -64,7 +64,7 @@ type Perfuplet struct {
 
 // Orchestrator describes Morpheo's orchestrator API
 type Orchestrator interface {
-	UpdateUpletStatus(upletType, status string, upletID uuid.UUID) error
+	UpdateUpletStatus(upletType, status string, upletID uuid.UUID, workerID uuid.UUID) error
 	PostLearnResult(learnupletID uuid.UUID, perfuplet Perfuplet) error
 }
 
@@ -79,7 +79,7 @@ type OrchestratorAPI struct {
 }
 
 // UpdateUpletStatus changes the status field of a learnuplet/preduplet
-func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upletID uuid.UUID) error {
+func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upletID uuid.UUID, workerID uuid.UUID) error {
 	if _, ok := common.ValidUplets[upletType]; !ok {
 		return fmt.Errorf("[orchestrator-api] Uplet type \"%s\" is invalid. Allowed values are %s", upletType, common.ValidUplets)
 	}
@@ -89,15 +89,16 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 
 	// TODO (orchestrator): make the orchestrator API RESTFul and get rid of this dirty logic
 	var url string
+	var payload []byte
 	if status == common.TaskStatusPending {
 		url = fmt.Sprintf("http://%s:%d%s/%s/%s", o.Hostname, o.Port, OrchestratorStatusUpdateRoute, upletType, upletID)
+		payload, _ = json.Marshal(map[string]string{"worker": workerID.String()})
 	} else if status == common.TaskStatusFailed {
 		url = fmt.Sprintf("http://%s:%d/%s/%s", o.Hostname, o.Port, upletType, upletID)
+		payload, _ = json.Marshal(map[string]string{"status": status})
 	} else {
 		return fmt.Errorf("[orchestrator-api] Status Update Error on %s %s: for now, only %s and %s statuses are supported", upletType, upletID, common.TaskStatusPending, common.TaskStatusFailed)
 	}
-
-	payload, _ := json.Marshal(map[string]string{"status": status})
 
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
@@ -164,9 +165,9 @@ func NewOrchestratorAPIMock() (s *OrchestratorAPIMock) {
 }
 
 // UpdateUpletStatus returns nil except if OrchestratorAPIMock.UnexistingUpletID is passed
-func (o *OrchestratorAPIMock) UpdateUpletStatus(upletType, status string, upletID uuid.UUID) error {
+func (o *OrchestratorAPIMock) UpdateUpletStatus(upletType, status string, upletID uuid.UUID, workerID uuid.UUID) error {
 	if upletID.String() != o.UnexistingUplet {
-		log.Printf("[orchestrator-mock] Received update status for %s-uplet %s. Status: %s", upletType, upletID, status)
+		log.Printf("[orchestrator-mock] Received update status from worker %s for %s %s. Status: %s", workerID, upletType, upletID, status)
 		return nil
 	}
 	return fmt.Errorf("[orchestrator-mock][status-update] Unexisting uplet %s", upletID)
