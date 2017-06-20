@@ -74,6 +74,8 @@ type OrchestratorAPI struct {
 
 	Hostname string
 	Port     int
+	User     string
+	Password string
 }
 
 // UpdateUpletStatus changes the status field of a learnuplet/preduplet
@@ -88,7 +90,11 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 
 	payload, _ := json.Marshal(map[string]string{"status": status})
 
-	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("[orchestrator-api] Error building result POST request against %s: %s", url, err)
+	}
+	req.SetBasicAuth(o.User, o.Password)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -108,6 +114,7 @@ func (o *OrchestratorAPI) postData(route string, upletID uuid.UUID, data io.Read
 	if err != nil {
 		return fmt.Errorf("[orchestrator-api] Error building result POST request against %s: %s", url, err)
 	}
+	req.SetBasicAuth(o.User, o.Password)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
