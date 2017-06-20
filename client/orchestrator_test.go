@@ -26,7 +26,7 @@ func TestUpletUpdateNormal(t *testing.T) {
 	ts, apiClient := orchestratorAPIUpdateMock(t, http.StatusOK)
 	defer ts.Close()
 
-	err := apiClient.UpdateUpletStatus(common.TypeLearnUplet, common.TaskStatusPending, uuid.NewV4())
+	err := apiClient.UpdateUpletStatus(common.TypeLearnUplet, common.TaskStatusPending, uuid.NewV4(), uuid.NewV4())
 	assert.Nil(t, err)
 }
 
@@ -36,7 +36,7 @@ func TestUpletUpdateBadType(t *testing.T) {
 	ts, apiClient := orchestratorAPIUpdateMock(t, http.StatusOK)
 	defer ts.Close()
 
-	err := apiClient.UpdateUpletStatus("weirduplet", common.TaskStatusDone, uuid.NewV4())
+	err := apiClient.UpdateUpletStatus("weirduplet", common.TaskStatusDone, uuid.NewV4(), uuid.NewV4())
 	assert.Error(t, err)
 }
 
@@ -46,7 +46,7 @@ func TestUpletUpdateBadTaskStatus(t *testing.T) {
 	ts, apiClient := orchestratorAPIUpdateMock(t, http.StatusOK)
 	defer ts.Close()
 
-	err := apiClient.UpdateUpletStatus(common.TypePredUplet, "invalid", uuid.NewV4())
+	err := apiClient.UpdateUpletStatus(common.TypePredUplet, "invalid", uuid.NewV4(), uuid.NewV4())
 	assert.Error(t, err)
 }
 
@@ -58,7 +58,7 @@ func TestUpletUpdateUnavailableServer(t *testing.T) {
 		Port:     666,
 	}
 
-	err := apiClient.UpdateUpletStatus(common.TypePredUplet, common.TaskStatusDone, uuid.NewV4())
+	err := apiClient.UpdateUpletStatus(common.TypePredUplet, common.TaskStatusDone, uuid.NewV4(), uuid.NewV4())
 	assert.Error(t, err)
 }
 
@@ -68,7 +68,7 @@ func TestUpletUpdateBadHTTPStatus(t *testing.T) {
 	ts, apiClient := orchestratorAPIUpdateMock(t, http.StatusTeapot)
 	defer ts.Close()
 
-	err := apiClient.UpdateUpletStatus(common.TypePredUplet, common.TaskStatusDone, uuid.NewV4())
+	err := apiClient.UpdateUpletStatus(common.TypePredUplet, common.TaskStatusDone, uuid.NewV4(), uuid.NewV4())
 	assert.Error(t, err)
 }
 
@@ -113,9 +113,9 @@ func TestPerfUploadNormal(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-// Test badly formatted JSON
+// Test badly formatted JSON TODO
 
-// Test non existing learnuplet
+// Test non existing learnuplet TODO
 
 func orchestratorAPIPostPerfMock(t *testing.T, statusCode int) (testServer *httptest.Server, apiClient client.Orchestrator) {
 	testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
