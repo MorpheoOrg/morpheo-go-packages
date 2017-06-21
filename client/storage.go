@@ -127,7 +127,7 @@ func (s *StorageAPI) getAndParseJSONObject(objectRoute string, objectID uuid.UUI
 	return nil
 }
 
-func (s *StorageAPI) postObjectBlob(prefix string, id uuid.UUID, dataReader io.Reader, size int64) error {
+func (s *StorageAPI) postObjectBlob(prefix string, dataReader io.Reader, size int64) error {
 	url := fmt.Sprintf("http://%s:%d/%s", s.Hostname, s.Port, prefix)
 
 	req, err := http.NewRequest(http.MethodPost, url, dataReader)
@@ -218,12 +218,12 @@ func (s *StorageAPI) GetDataBlob(id uuid.UUID) (dataReader io.ReadCloser, err er
 // PostProblemWorkflow returns an io.ReadCloser to a problem workflow image (a .tar.gz file on the
 // image's build context)
 func (s *StorageAPI) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error {
-	return s.postObjectBlob(StorageProblemWorkflowRoute, id, problemReader, size)
+	return s.postObjectBlob(StorageProblemWorkflowRoute, problemReader, size)
 }
 
 // PostAlgo returns an io.ReadCloser to a algo image
 func (s *StorageAPI) PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error {
-	return s.postObjectBlob(StorageAlgoRoute, id, algoReader, size)
+	return s.postObjectBlob(StorageAlgoRoute, algoReader, size)
 }
 
 // PostModel returns an io.ReadCloser to a model
@@ -233,12 +233,12 @@ func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size 
 		return fmt.Errorf("Algorithm %s associated to posted model wasn't found", model.Algo)
 	}
 
-	return s.postObjectBlob(fmt.Sprintf("%s?algo=%s", StorageModelRoute, model.Algo), model.ID, modelReader, size)
+	return s.postObjectBlob(fmt.Sprintf("%s?uuid=%s&algo=%s", StorageModelRoute, model.ID, model.Algo), modelReader, size)
 }
 
 // PostData returns an io.ReadCloser to a data image
 func (s *StorageAPI) PostData(id uuid.UUID, dataReader io.Reader, size int64) error {
-	return s.postObjectBlob(StorageDataRoute, id, dataReader, size)
+	return s.postObjectBlob(StorageDataRoute, dataReader, size)
 }
 
 // StorageAPIMock is a mock of the storage API (for tests & local dev. purposes)
