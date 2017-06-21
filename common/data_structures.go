@@ -235,8 +235,12 @@ type Blob struct {
 	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
 }
 
-func (b *Blob) fillNewBlob() {
-	b.ID = uuid.NewV4()
+func (b *Blob) fillNewBlob(id uuid.UUID) {
+	if id == uuid.Nil {
+		b.ID = uuid.NewV4()
+	} else {
+		b.ID = id
+	}
 	b.TimestampUpload = int32(time.Now().Unix())
 }
 
@@ -252,7 +256,7 @@ func NewProblem() *Problem {
 	problem := &Problem{
 		Author: uuid.NewV4(),
 	}
-	problem.fillNewBlob()
+	problem.fillNewBlob(uuid.Nil)
 	return problem
 }
 
@@ -275,7 +279,7 @@ func NewAlgo() *Algo {
 	algo := &Algo{
 		Author: uuid.NewV4(),
 	}
-	algo.fillNewBlob()
+	algo.fillNewBlob(uuid.Nil)
 	return algo
 }
 
@@ -294,12 +298,12 @@ type Model struct {
 }
 
 // NewModel creates a model instance
-func NewModel(algo *Algo) *Model {
+func NewModel(id uuid.UUID, algo *Algo) *Model {
 	model := &Model{
 		Algo:   algo.ID,
 		Author: uuid.NewV4(),
 	}
-	model.fillNewBlob()
+	model.fillNewBlob(id)
 	return model
 }
 
@@ -321,7 +325,7 @@ func NewData() *Data {
 	data := &Data{
 		Owner: uuid.NewV4(),
 	}
-	data.fillNewBlob()
+	data.fillNewBlob(uuid.Nil)
 	return data
 }
 
