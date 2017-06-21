@@ -46,7 +46,7 @@ import (
 // This little perverts make Put and Get calls fail
 const (
 	NaughtySize      = 69
-	ViciousDevilUUID = "66666666-6969-6969-6969-666666666666"
+	ViciousDevilUUID = "2cd41d08-ef54-4a15-95a1-2e84ca72a22c"
 )
 
 // FakeBlobStore is a BlobStore implementations for tests
