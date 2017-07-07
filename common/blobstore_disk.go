@@ -82,3 +82,23 @@ func (s *LocalBlobStore) Get(key string) (data io.ReadCloser, err error) {
 	datapath := filepath.Join(s.DataDir, key)
 	return os.Open(datapath)
 }
+
+// Delete removes the file on disk
+func (s *LocalBlobStore) Delete(key string) error {
+	datapath := filepath.Join(s.DataDir, key)
+	if err := os.Remove(datapath); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Rename renames the file on disk
+func (s *LocalBlobStore) Rename(key string, newKey string) error {
+	datapath := filepath.Join(s.DataDir, key)
+	newDatapath := filepath.Join(s.DataDir, newKey)
+
+	if err := os.Rename(datapath, newDatapath); err != nil {
+		return err
+	}
+	return nil
+}

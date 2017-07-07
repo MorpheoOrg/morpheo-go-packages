@@ -80,6 +80,16 @@ func (s *FakeBlobStore) Get(key string) (data io.ReadCloser, err error) {
 	return fakeFile(), nil
 }
 
+// Delete remove the file
+func (s *FakeBlobStore) Delete(key string) (err error) {
+	return nil
+}
+
+// Rename renames the file
+func (s *FakeBlobStore) Rename(key string, newKey string) (err error) {
+	return nil
+}
+
 func fakeFile() io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewBuffer([]byte("fakeFileContent")))
 }
