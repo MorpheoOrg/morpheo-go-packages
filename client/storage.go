@@ -66,10 +66,7 @@ type Storage interface {
 	GetAlgoBlob(id uuid.UUID) (algoReader io.ReadCloser, err error)
 	GetModelBlob(id uuid.UUID) (modelReader io.ReadCloser, err error)
 	GetProblemWorkflowBlob(id uuid.UUID) (problemReader io.ReadCloser, err error)
-	PostData(id uuid.UUID, dataReader io.Reader, size int64) error
-	PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error
 	PostModel(model *common.Model, algoReader io.Reader, size int64) error
-	PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error
 }
 
 // StorageAPI is a wrapper around our storage HTTP API
@@ -215,17 +212,6 @@ func (s *StorageAPI) GetDataBlob(id uuid.UUID) (dataReader io.ReadCloser, err er
 	return s.getObjectBlob(StorageDataRoute, id)
 }
 
-// PostProblemWorkflow returns an io.ReadCloser to a problem workflow image (a .tar.gz file on the
-// image's build context)
-func (s *StorageAPI) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error {
-	return s.postObjectBlob(StorageProblemWorkflowRoute, problemReader, size)
-}
-
-// PostAlgo returns an io.ReadCloser to a algo image
-func (s *StorageAPI) PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error {
-	return s.postObjectBlob(StorageAlgoRoute, algoReader, size)
-}
-
 // PostModel returns an io.ReadCloser to a model
 func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size int64) error {
 	// Check for associated Algo existence
@@ -234,11 +220,6 @@ func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size 
 	}
 
 	return s.postObjectBlob(fmt.Sprintf("%s?uuid=%s&algo=%s", StorageModelRoute, model.ID, model.Algo), modelReader, size)
-}
-
-// PostData returns an io.ReadCloser to a data image
-func (s *StorageAPI) PostData(id uuid.UUID, dataReader io.Reader, size int64) error {
-	return s.postObjectBlob(StorageDataRoute, dataReader, size)
 }
 
 // StorageAPIMock is a mock of the storage API (for tests & local dev. purposes)
@@ -284,24 +265,6 @@ func (s *StorageAPIMock) GetProblemWorkflow(id uuid.UUID) (dataReader io.ReadClo
 	}
 
 	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
-}
-
-// PostData forwards the given reader data bytes... to /dev/null AHAHAHAH !
-func (s *StorageAPIMock) PostData(id uuid.UUID, dataReader io.Reader, size int64) error {
-	_, err := io.Copy(ioutil.Discard, dataReader)
-	return err
-}
-
-// PostAlgo sends an algorithm... to oblivion
-func (s *StorageAPIMock) PostAlgo(id uuid.UUID, algoReader io.Reader, size int64) error {
-	_, err := io.Copy(ioutil.Discard, algoReader)
-	return err
-}
-
-// PostProblemWorkflow fills the universe with one more problem, but the universe doesn't care
-func (s *StorageAPIMock) PostProblemWorkflow(id uuid.UUID, problemReader io.Reader, size int64) error {
-	_, err := io.Copy(ioutil.Discard, problemReader)
-	return err
 }
 
 // PostModel sends a model... to Oblivion
