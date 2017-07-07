@@ -229,139 +229,209 @@ func (e *FatalTaskError) Error() string {
 
 // Storage specific types
 
-// Blob defines an abstract blob of data
-type Blob struct {
-	ID              uuid.UUID `json:"uuid" db:"uuid"`
-	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
-}
-
-func (b *Blob) fillNewBlob(id uuid.UUID) {
-	if id == uuid.Nil {
-		b.ID = uuid.NewV4()
-	} else {
-		b.ID = id
-	}
-	b.TimestampUpload = int32(time.Now().Unix())
+// Resource is an interace for methods on all the resources (Problem, Algo, etc.)
+type Resource interface {
+	GetUUID() uuid.UUID
+	FillResource(fields map[string]interface{}) error
+	Check() error
 }
 
 // Problem defines a problem blob (should be a .tar.gz containing a Dockerfile)
 type Problem struct {
-	Blob
+	ID              uuid.UUID `json:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
+	Name            string    `json:"name" db:"name"`
+	Description     string    `json:"description" db:"description"`
+	Owner           uuid.UUID `json:"owner" db:"owner"`
+}
 
-	Author uuid.UUID `json:"author" db:"author"`
+// Algo defines an algorithm blob (should be a .tar.gz containing a Dockerfile)
+type Algo struct {
+	ID              uuid.UUID `json:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
+	Name            string    `json:"name" db:"name"`
+	Owner           uuid.UUID `json:"owner" db:"owner"`
+}
+
+// Model defines a model blob (should be a .tar.gz of the model folder)
+type Model struct {
+	ID              uuid.UUID `json:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
+	Algo            uuid.UUID `json:"algo" db:"algo"`
+	Owner           uuid.UUID `json:"owner" db:"owner"`
+}
+
+// Data defines a data blob
+type Data struct {
+	ID              uuid.UUID `json:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
+	Owner           uuid.UUID `json:"owner" db:"owner"`
 }
 
 // NewProblem creates a problem instance
 func NewProblem() *Problem {
 	problem := &Problem{
-		Author: uuid.NewV4(),
+		ID:              uuid.NewV4(),
+		TimestampUpload: int32(time.Now().Unix()),
+		Owner:           uuid.NewV4(),
 	}
-	problem.fillNewBlob(uuid.Nil)
 	return problem
-}
-
-// Check returns nil for now
-func (p *Problem) Check() error {
-	// TODO: check what should be
-	return nil
-}
-
-// Algo defines an algorithm blob (should be a .tar.gz containing a Dockerfile)
-type Algo struct {
-	Blob
-
-	Name   string    `json:"name" db:"name"`
-	Author uuid.UUID `json:"author" db:"author"`
 }
 
 // NewAlgo creates an Algo instance
 func NewAlgo() *Algo {
 	algo := &Algo{
-		Author: uuid.NewV4(),
+		ID:              uuid.NewV4(),
+		TimestampUpload: int32(time.Now().Unix()),
+		Owner:           uuid.NewV4(),
 	}
-	algo.fillNewBlob(uuid.Nil)
 	return algo
 }
 
-// Check returns nil for now
-func (a *Algo) Check() error {
-	// TODO: check what should be
-	return nil
-}
-
-// Model defines a model blob (should be a .tar.gz of the model folder)
-type Model struct {
-	Blob
-
-	Algo   uuid.UUID `json:"algo" db:"algo"`
-	Author uuid.UUID `json:"author" db:"author"`
-}
-
-// NewModel creates a model instance
+// NewModel creates a model instance - Used by Storage AND Compute
 func NewModel(id uuid.UUID, algo *Algo) *Model {
 	model := &Model{
-		Algo:   algo.ID,
-		Author: uuid.NewV4(),
+		ID:              uuid.NewV4(),
+		TimestampUpload: int32(time.Now().Unix()),
+		Algo:            algo.ID,
+		Owner:           uuid.NewV4(),
 	}
-	model.fillNewBlob(id)
 	return model
-}
-
-// Check returns nil for now
-func (m *Model) Check() error {
-	// TODO: check what should be
-	return nil
-}
-
-// Data defines a data blob
-type Data struct {
-	Blob
-
-	Owner uuid.UUID `json:"owner" db:"owner"`
 }
 
 // NewData creates a problem instance
 func NewData() *Data {
 	data := &Data{
-		Owner: uuid.NewV4(),
+		ID:              uuid.NewV4(),
+		TimestampUpload: int32(time.Now().Unix()),
+		Owner:           uuid.NewV4(),
 	}
-	data.fillNewBlob(uuid.Nil)
 	return data
 }
 
-// Check returns nil for now
-func (d *Data) Check() error {
-	// TODO: check what should be
+// GetUUID returns the problem uuid
+func (p *Problem) GetUUID() uuid.UUID {
+	return p.ID
+}
+
+// FillResource fills the resource with elements in a map
+func (p *Problem) FillResource(fields map[string]interface{}) error {
+	// TODO: Try generic func with reflection
+	for k, v := range fields {
+		switch k {
+		case "uuid":
+			p.ID = v.(uuid.UUID) // TODO: handle errors with type assertion...
+		case "name":
+			p.Name = v.(string)
+		case "description":
+			p.Description = v.(string)
+		case "owner":
+			p.Owner = v.(uuid.UUID)
+		default:
+			return fmt.Errorf("%s is not a valid field for problem", k)
+		}
+	}
+	p.TimestampUpload = int32(time.Now().Unix())
 	return nil
 }
 
-// MultipartFormFields gathers the valid form fields of a POST multipart/form-data request
-type MultipartFormFields struct {
-	Description string
-	Name        string
-	Size        int64
+// Check returns nil if the Resrouce is correctly filled
+func (p *Problem) Check() error {
+	if uuid.Equal(uuid.Nil, p.ID) {
+		return fmt.Errorf("'UUID' unset")
+	}
+	if uuid.Equal(uuid.Nil, p.Owner) {
+		return fmt.Errorf("'Owner' unset")
+	}
+	if p.Name == "" {
+		return fmt.Errorf("'Name' unset")
+	}
+	if p.Description == "" {
+		return fmt.Errorf("'Description' unset")
+	}
+	if uuid.Equal(uuid.Nil, p.Owner) {
+		return fmt.Errorf("'Owner' unset")
+	}
+	if p.TimestampUpload <= 0 {
+		return fmt.Errorf("'Timestamp_upload' unset")
+	}
+	return nil
 }
 
-// CheckFormFields checks if the PostFormFields are correct for the given blobType
-func CheckFormFields(blobType string, mff *MultipartFormFields) error {
-	switch blobType {
-	case "problem":
-		if mff.Name != "" {
-			return fmt.Errorf("Invalid form: 'name' is not a valid field for Problem")
-		}
-		if mff.Description == "" || mff.Size == 0 {
-			return fmt.Errorf("Invalid form: 'size' and 'description' fields should be non-empty and sent before blob")
-		}
-		return nil
+// GetUUID returns the problem uuid
+func (a *Algo) GetUUID() uuid.UUID {
+	return a.ID
+}
 
-	case "algo":
-		if mff.Description != "" {
-			return fmt.Errorf("Invalid form: 'description' is not a valid field for algo")
+// FillResource fills the resource with elements in a map
+func (a *Algo) FillResource(fields map[string]interface{}) error {
+	for k, v := range fields {
+		switch k {
+		case "uuid":
+			a.ID = v.(uuid.UUID)
+		case "name":
+			a.Name = v.(string)
+		case "owner":
+			a.Owner = v.(uuid.UUID)
+		default:
+			return fmt.Errorf("%s is not a valid field for algo", k)
 		}
-		if mff.Name == "" || mff.Size == 0 {
-			return fmt.Errorf("Invalid form: 'size' and 'name' fields should be non-empty and sent before blob")
-		}
-		return nil
 	}
-	return fmt.Errorf("Invalid blobType in CheckFormFields()")
+	a.TimestampUpload = int32(time.Now().Unix())
+	return nil
+}
+
+// Check returns nil if the Resrouce is correctly filled
+func (a *Algo) Check() error {
+	if uuid.Equal(uuid.Nil, a.ID) {
+		return fmt.Errorf("'UUID' unset")
+	}
+	if a.Name == "" {
+		return fmt.Errorf("'Name' unset")
+	}
+	if uuid.Equal(uuid.Nil, a.Owner) {
+		return fmt.Errorf("'Owner' unset")
+	}
+	if a.TimestampUpload <= 0 {
+		return fmt.Errorf("'Timestamp_upload' unset")
+	}
+	return nil
+}
+
+// GetUUID returns the problem uuid
+func (d *Data) GetUUID() uuid.UUID {
+	return d.ID
+}
+
+// FillResource fills the resource with elements in a map
+func (d *Data) FillResource(fields map[string]interface{}) error {
+	// TODO: Try generic func with reflection
+	for k, v := range fields {
+		switch k {
+		case "uuid":
+			d.ID = v.(uuid.UUID) // TODO: handle errors with type assertion...
+		case "owner":
+			d.Owner = v.(uuid.UUID)
+		default:
+			return fmt.Errorf("%s is not a valid field for data", k)
+		}
+	}
+	d.TimestampUpload = int32(time.Now().Unix())
+	return nil
+}
+
+// Check returns nil if the Resrouce is correctly filled
+func (d *Data) Check() error {
+	if uuid.Equal(uuid.Nil, d.ID) {
+		return fmt.Errorf("'UUID' unset")
+	}
+
+	if uuid.Equal(uuid.Nil, d.Owner) {
+		return fmt.Errorf("'Owner' unset")
+	}
+
+	if d.TimestampUpload <= 0 {
+		return fmt.Errorf("'Timestamp_upload' unset")
+	}
+	return nil
 }
