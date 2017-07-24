@@ -358,6 +358,12 @@ func (p *Problem) Check() error {
 	return nil
 }
 
+// Truncate returns the problem with a truncated description for readability
+func (p *Problem) Truncate() *Problem {
+	p.Description = p.Description[:30] + "..."
+	return p
+}
+
 // GetUUID returns the problem uuid
 func (a *Algo) GetUUID() uuid.UUID {
 	return a.ID
