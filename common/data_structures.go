@@ -290,8 +290,12 @@ func NewAlgo() *Algo {
 
 // NewModel creates a model instance - Used by Storage AND Compute
 func NewModel(id uuid.UUID, algo *Algo) *Model {
+	idModel := id
+	if idModel == uuid.Nil {
+		idModel = uuid.NewV4()
+	}
 	model := &Model{
-		ID:              uuid.NewV4(),
+		ID:              idModel,
 		TimestampUpload: int32(time.Now().Unix()),
 		Algo:            algo.ID,
 		Owner:           uuid.NewV4(),
