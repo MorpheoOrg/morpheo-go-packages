@@ -268,6 +268,12 @@ type Data struct {
 	Owner           uuid.UUID `json:"owner" db:"owner"`
 }
 
+// Prediction defines a prediction blob
+type Prediction struct {
+	ID              uuid.UUID `json:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
+}
+
 // NewProblem creates a problem instance
 func NewProblem() *Problem {
 	problem := &Problem{
@@ -311,6 +317,15 @@ func NewData() *Data {
 		Owner:           uuid.NewV4(),
 	}
 	return data
+}
+
+// NewPrediction creates a prediction instance
+func NewPrediction() *Prediction {
+	prediction := &Prediction{
+		ID:              uuid.NewV4(),
+		TimestampUpload: int32(time.Now().Unix()),
+	}
+	return prediction
 }
 
 // GetUUID returns the problem uuid
@@ -435,6 +450,36 @@ func (d *Data) Check() error {
 	}
 
 	if d.TimestampUpload <= 0 {
+		return fmt.Errorf("'Timestamp_upload' unset")
+	}
+	return nil
+}
+
+// GetUUID returns the problem uuid
+func (p *Prediction) GetUUID() uuid.UUID {
+	return p.ID
+}
+
+// FillResource fills the resource with elements in a map
+func (p *Prediction) FillResource(fields map[string]interface{}) error {
+	for k, v := range fields {
+		switch k {
+		case "uuid":
+			p.ID = v.(uuid.UUID) // TODO: handle errors with type assertion...
+		default:
+			return fmt.Errorf("%s is not a valid field for problem", k)
+		}
+	}
+	p.TimestampUpload = int32(time.Now().Unix())
+	return nil
+}
+
+// Check returns nil if the Resrouce is correctly filled
+func (p *Prediction) Check() error {
+	if uuid.Equal(uuid.Nil, p.ID) {
+		return fmt.Errorf("'UUID' unset")
+	}
+	if p.TimestampUpload <= 0 {
 		return fmt.Errorf("'Timestamp_upload' unset")
 	}
 	return nil
