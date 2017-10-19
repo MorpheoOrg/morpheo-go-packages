@@ -195,6 +195,7 @@ func (s *StorageAPI) postResourceMultipartBlob(prefix string, params map[string]
 
 	// Add required headers
 	req.SetBasicAuth(s.User, s.Password)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// Perform POST Request
 	resp, err := http.DefaultClient.Do(req)
