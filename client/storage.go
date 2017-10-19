@@ -41,7 +41,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"strconv"
 
 	"github.com/MorpheoOrg/go-packages/common"
 	"github.com/satori/go.uuid"
@@ -67,6 +69,7 @@ type Storage interface {
 	GetModelBlob(id uuid.UUID) (modelReader io.ReadCloser, err error)
 	GetProblemWorkflowBlob(id uuid.UUID) (problemReader io.ReadCloser, err error)
 	PostModel(model *common.Model, algoReader io.Reader, size int64) error
+	PostPrediction(prediction *common.Prediction, predReader io.Reader, size int) error
 }
 
 // StorageAPI is a wrapper around our storage HTTP API
@@ -124,7 +127,7 @@ func (s *StorageAPI) getAndParseJSONObject(objectRoute string, objectID uuid.UUI
 	return nil
 }
 
-func (s *StorageAPI) postObjectBlob(prefix string, dataReader io.Reader, size int64) error {
+func (s *StorageAPI) postResourceBlob(prefix string, dataReader io.Reader, size int64) error {
 	url := fmt.Sprintf("http://%s:%d/%s", s.Hostname, s.Port, prefix)
 
 	req, err := http.NewRequest(http.MethodPost, url, dataReader)
@@ -141,6 +144,65 @@ func (s *StorageAPI) postObjectBlob(prefix string, dataReader io.Reader, size in
 		return fmt.Errorf("[storage-api] Error performing streaming POST request against %s: %s", url, err)
 	}
 
+	if resp.StatusCode != http.StatusCreated {
+		var apiError common.APIError
+		var errorMessage string
+		err = json.NewDecoder(resp.Body).Decode(&apiError)
+		if err != nil {
+			errorMessage = "Unable to decode error message"
+		}
+		errorMessage = apiError.Message
+		return fmt.Errorf("[storage-api] Bad status code (%s) performing streaming POST request against %s -- API Error: %s", resp.Status, url, errorMessage)
+	}
+
+	return nil
+}
+
+// postResourceMultipartBlob perform a POST request to storage using a multipart form.
+// The filefield is the last field sent in the body, in order to allow streaming request.
+func (s *StorageAPI) postResourceMultipartBlob(prefix string, params map[string]string, fileFieldName string, fileName string, fileReader io.Reader) error {
+	// TODO: check that params are valid for the corresponding prefix
+
+	// Build the multipart form field
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	for key, val := range params {
+		err := writer.WriteField(key, val)
+		if err != nil {
+			return fmt.Errorf("Error writing param %s in %s multipart writer: %s", key, prefix, err)
+		}
+	}
+
+	part, err := writer.CreateFormFile(fileFieldName, fileName)
+	if err != nil {
+		return fmt.Errorf("Error writing param blob in %s multipart writer: %s", prefix, err)
+	}
+	_, err = io.Copy(part, fileReader)
+	if err != nil {
+		return fmt.Errorf("Error copying file in %s multipart write: %s", prefix, err)
+	}
+	err = writer.Close()
+	if err != nil {
+		return fmt.Errorf("Error closing %s multipart writer: %s", prefix, err)
+	}
+
+	// Build POST request
+	url := fmt.Sprintf("http://%s:%d/%s", s.Hostname, s.Port, prefix)
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return fmt.Errorf("[storage-api] Error building streaming POST request against %s: %s", url, err)
+	}
+
+	// Add required headers
+	req.SetBasicAuth(s.User, s.Password)
+
+	// Perform POST Request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("[storage-api] Error performing streaming POST request against %s: %s", url, err)
+	}
+
+	// Handle response errors
 	if resp.StatusCode != http.StatusCreated {
 		var apiError common.APIError
 		var errorMessage string
@@ -219,7 +281,40 @@ func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size 
 		return fmt.Errorf("Algorithm %s associated to posted model wasn't found", model.Algo)
 	}
 
-	return s.postObjectBlob(fmt.Sprintf("%s?uuid=%s&algo=%s", StorageModelRoute, model.ID, model.Algo), modelReader, size)
+	return s.postResourceBlob(fmt.Sprintf("%s?uuid=%s&algo=%s", StorageModelRoute, model.ID, model.Algo), modelReader, size)
+}
+
+// PostPrediction posts a new prediction to storage
+func (s *StorageAPI) PostProblem(problem *common.Problem, size int, problemReader io.Reader) error {
+
+	// Check that problem is valid
+	if err := problem.Check(); err != nil {
+		return fmt.Errorf("error checking prediction resource: %s", err)
+	}
+
+	// Build params
+	params := make(map[string]string)
+	params["uuid"] = problem.ID.String()
+	params["name"] = problem.Name
+	params["description"] = problem.Description
+	params["size"] = strconv.Itoa(size)
+
+	return s.postResourceMultipartBlob("problem", params, "blob", params["uuid"], problemReader)
+}
+
+// PostPrediction posts a new prediction to storage
+func (s *StorageAPI) PostPrediction(prediction *common.Prediction, predReader io.Reader, size int) error {
+	// Check that prediction is valid
+	if err := prediction.Check(); err != nil {
+		return fmt.Errorf("error checking prediction resource: %s", err)
+	}
+
+	// Build params
+	params := make(map[string]string)
+	params["uuid"] = prediction.ID.String()
+	params["size"] = strconv.Itoa(size)
+
+	return s.postResourceMultipartBlob("prediction", params, "blob", params["uuid"], predReader)
 }
 
 // StorageAPIMock is a mock of the storage API (for tests & local dev. purposes)
@@ -268,7 +363,13 @@ func (s *StorageAPIMock) GetProblemWorkflow(id uuid.UUID) (dataReader io.ReadClo
 }
 
 // PostModel sends a model... to Oblivion
-func (s *StorageAPIMock) PostModel(id uuid.UUID, modelReader io.Reader, size int64) error {
+func (s *StorageAPIMock) PostModel(model *common.Model, modelReader io.Reader, size int64) error {
 	_, err := io.Copy(ioutil.Discard, modelReader)
+	return err
+}
+
+// PostPrediction sends a prediction... to Oblivion
+func (s *StorageAPIMock) PostPrediction(prediction *common.Prediction, predReader io.Reader, size int64) error {
+	_, err := io.Copy(ioutil.Discard, predReader)
 	return err
 }
