@@ -439,7 +439,7 @@ func (d *Data) FillResource(fields map[string]interface{}) error {
 	return nil
 }
 
-// Check returns nil if the Resrouce is correctly filled
+// Check returns nil if the Resource is correctly filled
 func (d *Data) Check() error {
 	if uuid.Equal(uuid.Nil, d.ID) {
 		return fmt.Errorf("'UUID' unset")
@@ -474,7 +474,7 @@ func (p *Prediction) FillResource(fields map[string]interface{}) error {
 	return nil
 }
 
-// Check returns nil if the Resrouce is correctly filled
+// Check returns nil if the Resource is correctly filled
 func (p *Prediction) Check() error {
 	if uuid.Equal(uuid.Nil, p.ID) {
 		return fmt.Errorf("'UUID' unset")
