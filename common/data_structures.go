@@ -84,14 +84,16 @@ type Checkable interface {
 type Preduplet struct {
 	Checkable
 
-	ID             uuid.UUID   `json:"uuid"`
-	Problem        uuid.UUID   `json:"problem"`
-	Model          uuid.UUID   `json:"model"`
-	Data           []uuid.UUID `json:"data"`
-	Worker         uuid.UUID   `json:"worker"`
-	Status         string      `json:"status"`
-	RequestDate    time.Time   `json:"timestamp_request"`
-	CompletionDate time.Time   `json:"timestamp_done"`
+	ID                  uuid.UUID `json:"uuid"`
+	Problem             uuid.UUID `json:"problem"`
+	Workflow            uuid.UUID `json:"workflow"`
+	Model               uuid.UUID `json:"model"`
+	Data                uuid.UUID `json:"data"`
+	WorkerID            uuid.UUID `json:"worker"`
+	Status              string    `json:"status"`
+	RequestDate         time.Time `json:"timestamp_request"`
+	CompletionDate      time.Time `json:"timestamp_done"`
+	PredictionStorageID uuid.UUID `json:"prediction_storage_uuid"`
 }
 
 // Check returns nil if the preduplet is valid, an explicit error otherwise
@@ -100,24 +102,21 @@ func (u *Preduplet) Check() (err error) {
 	if uuid.Equal(uuid.Nil, u.ID) {
 		return fmt.Errorf("id field is unset")
 	}
-
 	if uuid.Equal(uuid.Nil, u.Problem) {
 		return fmt.Errorf("problem field is unset")
 	}
-
+	if uuid.Equal(uuid.Nil, u.Workflow) {
+		return fmt.Errorf("workflow field is unset")
+	}
 	if uuid.Equal(uuid.Nil, u.Model) {
 		return fmt.Errorf("model field is required")
 	}
-
 	if len(u.Data) == 0 {
 		return fmt.Errorf("data field is empty or unset")
 	}
-	for n, id := range u.Data {
-		if uuid.Equal(uuid.Nil, id) {
-			return fmt.Errorf("Nil UUID in data field at pos %d", n)
-		}
+	if uuid.Equal(uuid.Nil, u.Data) {
+		return fmt.Errorf("Nil UUID in data field")
 	}
-
 	if _, ok := ValidStatuses[u.Status]; !ok {
 		return fmt.Errorf("status field ain't valid (provided: %s, possible choices: %s", u.Status, ValidStatuses)
 	}
