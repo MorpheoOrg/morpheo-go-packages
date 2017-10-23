@@ -54,6 +54,14 @@ const (
 	OrchestratorPredResultRoute   = "/preddone"
 )
 
+var (
+	// OrchestratorResultRoutes sets result routes by uplet-type
+	OrchestratorResultRoutes = map[string]string{
+		common.TypeLearnUplet: OrchestratorLearnResultRoute,
+		common.TypePredUplet:  OrchestratorPredResultRoute,
+	}
+)
+
 // Perfuplet describes the response of compute to the orchestrator
 type Perfuplet struct {
 	Status    string             `json:"status"`
@@ -62,10 +70,17 @@ type Perfuplet struct {
 	TestPerf  map[string]float64 `json:"test_perf"`
 }
 
+// Preddone describes compute requests to the orchestrator
+type Preddone struct {
+	Status              string    `json:"status"`
+	PredictionStorageID uuid.UUID `json:"prediction_storage_uuid"`
+}
+
 // Orchestrator describes Morpheo's orchestrator API
 type Orchestrator interface {
 	UpdateUpletStatus(upletType, status string, upletID uuid.UUID, workerID uuid.UUID) error
 	PostLearnResult(learnupletID uuid.UUID, perfuplet Perfuplet) error
+	PostPredResult(predupletID uuid.UUID, preddone Preddone) error
 }
 
 // OrchestratorAPI is a wrapper around our orchestrator API
@@ -94,7 +109,13 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 		url = fmt.Sprintf("http://%s:%d%s/%s/%s", o.Hostname, o.Port, OrchestratorStatusUpdateRoute, upletType, upletID)
 		payload, _ = json.Marshal(map[string]string{"worker": workerID.String()})
 	} else if status == common.TaskStatusFailed {
-		url = fmt.Sprintf("http://%s:%d/%s/%s", o.Hostname, o.Port, upletType, upletID)
+		url = fmt.Sprintf("http://%s:%d/%s/%s", o.Hostname, o.Port, OrchestratorResultRoutes[upletType], upletID)
+		payload, _ = json.Marshal(map[string]string{"status": status})
+	} else if status == common.TaskStatusDone {
+		if _, ok := OrchestratorResultRoutes[upletType]; !ok {
+			return fmt.Errorf("[orchestrator-api] Uplet type \"%s\" is invalid for status '%s' update. Allowed values are %s", upletType, common.TaskStatusDone, OrchestratorResultRoutes)
+		}
+		url = fmt.Sprintf("http://%s:%d%s/%s", o.Hostname, o.Port, OrchestratorResultRoutes[upletType], upletID)
 		payload, _ = json.Marshal(map[string]string{"status": status})
 	} else {
 		return fmt.Errorf("[orchestrator-api] Status Update Error on %s %s: for now, only %s and %s statuses are supported", upletType, upletID, common.TaskStatusPending, common.TaskStatusFailed)
@@ -134,7 +155,7 @@ func (o *OrchestratorAPI) postJSONData(route string, upletID uuid.UUID, data io.
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("[orchestrator-api] Unexpected status code (%s): result POST request against %s", resp.Status, url)
+		return fmt.Errorf("[orchestrator-api] Unexpected status code (%s): result POST request against %s, Body: %s", resp.Status, url, resp.Body)
 	}
 	return nil
 }
@@ -147,6 +168,17 @@ func (o *OrchestratorAPI) PostLearnResult(learnupletID uuid.UUID, perfuplet Perf
 	}
 	data := bytes.NewReader(dataBytes)
 	return o.postJSONData(OrchestratorLearnResultRoute, learnupletID, data)
+}
+
+// PostPredResult forwards a JSON-formatted pred result to the orchestrator HTTP API
+func (o *OrchestratorAPI) PostPredResult(predupletID uuid.UUID, preddone Preddone) error {
+	dataBytes, err := json.Marshal(preddone)
+	if err != nil {
+		return fmt.Errorf("Error marshaling perfuplet to JSON: %+v", preddone)
+	}
+
+	data := bytes.NewReader(dataBytes)
+	return o.postJSONData(OrchestratorPredResultRoute, predupletID, data)
 }
 
 // OrchestratorAPIMock mocks the Orchestrator API, always returning ok to update queries except for

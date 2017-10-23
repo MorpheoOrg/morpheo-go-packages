@@ -285,7 +285,7 @@ func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size 
 	return s.postResourceBlob(fmt.Sprintf("%s?uuid=%s&algo=%s", StorageModelRoute, model.ID, model.Algo), modelReader, size)
 }
 
-// PostPrediction posts a new prediction to storage
+// PostProblem posts a new problem to storage
 func (s *StorageAPI) PostProblem(problem *common.Problem, size int, problemReader io.Reader) error {
 
 	// Check that problem is valid
