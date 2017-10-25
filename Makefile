@@ -36,17 +36,17 @@
 # (Containerized) build commands
 BUILD_CONTAINER = \
   docker run -u $(shell id -u) -it --rm \
-	  --workdir "/usr/local/go/src/github.com/MorpheoOrg/go-packages" \
-	  -v $${PWD}:/usr/local/go/src/github.com/MorpheoOrg/go-packages:ro \
+	  --workdir "/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-packages" \
+	  -v $${PWD}:/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-packages:ro \
 	  -v $${PWD}/vendor:/vendor/src \
 	  -e GOPATH="/go:/vendor" \
 	  -e CGO_ENABLED=0 \
 	  -e GOOS=linux
 
-GLIDE_CONTAINER = \
+DEP_CONTAINER = \
 	docker run -it --rm \
-	  --workdir "/usr/local/go/src/github.com/MorpheoOrg/go-morpheo" \
-	  -v $${PWD}:/usr/local/go/src/github.com/MorpheoOrg/go-morpheo \
+	  --workdir "/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-morpheo" \
+	  -v $${PWD}:/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-morpheo \
 		$(BUILD_CONTAINER_IMAGE)
 
 BUILD_CONTAINER_IMAGE = golang:1-onbuild
@@ -67,12 +67,12 @@ test: $(TEST_TARGETS)
 clean: vendor-clean
 
 # 1. Vendoring
-vendor: glide.yaml
-	@echo "Pulling dependencies with glide... in a build container too"
+vendor: Gopkg.toml
+	@echo "Pulling dependencies with dep... in a build container too"
 	rm -rf ./vendor
 	mkdir ./vendor
-	$(GLIDE_CONTAINER) bash -c \
-		"go get github.com/Masterminds/glide && glide install && chown $(shell id -u):$(shell id -g) -R ./glide.lock ./vendor"
+	$(DEP_CONTAINER) bash -c \
+		"go get -u github.com/golang/dep/cmd/dep && dep ensure && chown $(shell id -u):$(shell id -g) -R ./Gopkg.* ./vendor"
 
 vendor-clean:
 	@echo "Dropping the vendor folder"

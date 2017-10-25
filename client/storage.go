@@ -45,7 +45,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/MorpheoOrg/go-packages/common"
+	"github.com/MorpheoOrg/morpheo-go-packages/common"
 	"github.com/satori/go.uuid"
 )
 
