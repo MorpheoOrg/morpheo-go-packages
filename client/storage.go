@@ -41,8 +41,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/MorpheoOrg/morpheo-go-packages/common"
@@ -69,7 +72,7 @@ type Storage interface {
 	GetModelBlob(id uuid.UUID) (modelReader io.ReadCloser, err error)
 	GetProblemWorkflowBlob(id uuid.UUID) (problemReader io.ReadCloser, err error)
 	PostModel(model *common.Model, algoReader io.Reader, size int64) error
-	PostPrediction(prediction *common.Prediction, predReader io.Reader, size int) error
+	PostPrediction(prediction *common.Prediction, predReader io.Reader, size int64) error
 }
 
 // StorageAPI is a wrapper around our storage HTTP API
@@ -304,7 +307,7 @@ func (s *StorageAPI) PostProblem(problem *common.Problem, size int, problemReade
 }
 
 // PostPrediction posts a new prediction to storage
-func (s *StorageAPI) PostPrediction(prediction *common.Prediction, predReader io.Reader, size int) error {
+func (s *StorageAPI) PostPrediction(prediction *common.Prediction, predReader io.Reader, size int64) error {
 	// Check that prediction is valid
 	if err := prediction.Check(); err != nil {
 		return fmt.Errorf("error checking prediction resource: %s", err)
@@ -313,53 +316,119 @@ func (s *StorageAPI) PostPrediction(prediction *common.Prediction, predReader io
 	// Build params
 	params := make(map[string]string)
 	params["uuid"] = prediction.ID.String()
-	params["size"] = strconv.Itoa(size)
+	params["size"] = strconv.FormatInt(size, 10)
 
 	return s.postResourceMultipartBlob("prediction", params, "blob", params["uuid"], predReader)
 }
 
 // StorageAPIMock is a mock of the storage API (for tests & local dev. purposes)
 type StorageAPIMock struct {
-	Storage
-
-	evilDataUUID    string
-	evilAlgoUUID    string
-	evilProblemUUID string
+	EvilUUID string
+	Fixtures *common.Fixtures
 }
 
 // NewStorageAPIMock instantiates our mock of the storage API
-func NewStorageAPIMock() (s *StorageAPIMock) {
-	return &StorageAPIMock{
-		evilDataUUID:    "58bc25d9-712d-4a53-8e73-2d6ca4d837c2",
-		evilAlgoUUID:    "610e134a-ff45-4416-aaac-1b3398e4bba6",
-		evilProblemUUID: "8f6563df-941d-4967-b517-f45169834741",
+func NewStorageAPIMock() (*StorageAPIMock, error) {
+	fixtures, err := common.LoadFixtures()
+	if err != nil {
+		return nil, fmt.Errorf("Error loading Fixtures: ", err)
 	}
+	return &StorageAPIMock{
+		EvilUUID: "610e134a-ff45-4416-aaac-1b3398e4bba6",
+		Fixtures: fixtures,
+	}, nil
 }
 
 // GetData returns fake data (the same, no matter the UUID)
-func (s *StorageAPIMock) GetData(id uuid.UUID) (dataReader io.ReadCloser, err error) {
-	if id.String() == s.evilDataUUID {
+func (s *StorageAPIMock) GetData(id uuid.UUID) (*common.Data, error) {
+	if id.String() == s.EvilUUID {
 		return nil, fmt.Errorf("Data %s not found on storage", id)
 	}
 
-	return ioutil.NopCloser(bytes.NewBufferString("datamock")), nil
+	return common.NewData(), nil
 }
 
 // GetAlgo returns a fake algo, no matter the UUID
-func (s *StorageAPIMock) GetAlgo(id uuid.UUID) (dataReader io.ReadCloser, err error) {
-	if id.String() == s.evilAlgoUUID {
+func (s *StorageAPIMock) GetAlgo(id uuid.UUID) (*common.Algo, error) {
+	if id.String() == s.EvilUUID {
 		return nil, fmt.Errorf("Algo %s not found on storage", id)
 	}
 
-	return ioutil.NopCloser(bytes.NewBufferString("algomock")), nil
+	return common.NewAlgo(), nil
+}
+
+// GetModel returns a fake model, no matter the UUID
+func (s *StorageAPIMock) GetModel(id uuid.UUID) (*common.Model, error) {
+	if id.String() == s.EvilUUID {
+		return nil, fmt.Errorf("Model %s not found on storage", id)
+	}
+	algo := common.NewAlgo()
+	if model := s.Fixtures.Orchestrator.Preduplet[0].Model; id == model {
+		// Returns the (real) associated algorithm
+		algo.ID = s.Fixtures.Orchestrator.Learnuplet[0].Algo
+	}
+	log.Printf("[storage-mock][GetModel] Sending model with algo %s", algo.ID.String())
+	return common.NewModel(id, algo), nil
 }
 
 // GetProblemWorkflow returns a fake algo, no matter the UUID
-func (s *StorageAPIMock) GetProblemWorkflow(id uuid.UUID) (dataReader io.ReadCloser, err error) {
-	if id.String() == s.evilAlgoUUID {
+func (s *StorageAPIMock) GetProblemWorkflow(id uuid.UUID) (*common.Problem, error) {
+	// Evil uuid returns Error
+	if id.String() == s.EvilUUID {
 		return nil, fmt.Errorf("Problem workflow %s not found on storage", id)
 	}
+	return common.NewProblem(), nil
+}
 
+// GetDataBlob returns a fake Data, no matter the UUID
+func (s *StorageAPIMock) GetDataBlob(id uuid.UUID) (io.ReadCloser, error) {
+	if id.String() == s.EvilUUID {
+		return nil, fmt.Errorf("Data blob %s not found on storage", id)
+	}
+
+	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+}
+
+// GetAlgoBlob returns a fake Algo, no matter the UUID
+func (s *StorageAPIMock) GetAlgoBlob(id uuid.UUID) (io.ReadCloser, error) {
+	if id.String() == s.EvilUUID {
+		return nil, fmt.Errorf("Algo blob %s not found on storage", id)
+	}
+	// Fixture returns a real algo
+	if algo := s.Fixtures.Orchestrator.Learnuplet[0].Algo; id == algo {
+		pathAlgo := filepath.Join(common.PathFixturesData["algo"], algo.String())
+		log.Printf("[storage-mock][GetProblemWorkflowBlob] Sending algo fixture from %s", pathAlgo)
+		return os.Open(pathAlgo)
+	}
+
+	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+}
+
+// GetModelBlob returns a fake Model, no matter the UUID
+func (s *StorageAPIMock) GetModelBlob(id uuid.UUID) (io.ReadCloser, error) {
+	if id.String() == s.EvilUUID {
+		return nil, fmt.Errorf("Model blob %s not found on storage", id)
+	}
+	// Fixture returns a real model
+	if model := s.Fixtures.Orchestrator.Preduplet[0].Model; id == model {
+		pathModel := filepath.Join(common.PathFixturesData["model"], model.String())
+		log.Printf("[storage-mock][GetProblemWorkflowBlob] Sending model fixture from %s", pathModel)
+		return os.Open(pathModel)
+	}
+	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+}
+
+// GetProblemWorkflowBlob returns a fake ProblemWorkflow, no matter the UUID
+func (s *StorageAPIMock) GetProblemWorkflowBlob(id uuid.UUID) (io.ReadCloser, error) {
+	if id.String() == s.EvilUUID {
+		return nil, fmt.Errorf("ProblemWorkflow blob %s not found on storage", id)
+	}
+	// Fixture returns a real problem
+	if workflow := s.Fixtures.Orchestrator.Learnuplet[0].Workflow; id == workflow {
+		pathProblem := filepath.Join(common.PathFixturesData["problem"], workflow.String())
+		log.Printf("[storage-mock][GetProblemWorkflowBlob] Sending problem fixture from %s", pathProblem)
+		return os.Open(pathProblem)
+	}
 	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
 }
 

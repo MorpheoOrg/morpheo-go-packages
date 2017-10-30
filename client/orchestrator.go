@@ -95,6 +95,7 @@ type OrchestratorAPI struct {
 
 // UpdateUpletStatus changes the status field of a learnuplet/preduplet
 func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upletID uuid.UUID, workerID uuid.UUID) error {
+	// Check that arguments are valid
 	if _, ok := common.ValidUplets[upletType]; !ok {
 		return fmt.Errorf("[orchestrator-api] Uplet type \"%s\" is invalid. Allowed values are %s", upletType, common.ValidUplets)
 	}
@@ -110,12 +111,6 @@ func (o *OrchestratorAPI) UpdateUpletStatus(upletType string, status string, upl
 		payload, _ = json.Marshal(map[string]string{"worker": workerID.String()})
 	} else if status == common.TaskStatusFailed {
 		url = fmt.Sprintf("http://%s:%d/%s/%s", o.Hostname, o.Port, OrchestratorResultRoutes[upletType], upletID)
-		payload, _ = json.Marshal(map[string]string{"status": status})
-	} else if status == common.TaskStatusDone {
-		if _, ok := OrchestratorResultRoutes[upletType]; !ok {
-			return fmt.Errorf("[orchestrator-api] Uplet type \"%s\" is invalid for status '%s' update. Allowed values are %s", upletType, common.TaskStatusDone, OrchestratorResultRoutes)
-		}
-		url = fmt.Sprintf("http://%s:%d%s/%s", o.Hostname, o.Port, OrchestratorResultRoutes[upletType], upletID)
 		payload, _ = json.Marshal(map[string]string{"status": status})
 	} else {
 		return fmt.Errorf("[orchestrator-api] Status Update Error on %s %s: for now, only %s and %s statuses are supported", upletType, upletID, common.TaskStatusPending, common.TaskStatusFailed)
@@ -212,4 +207,13 @@ func (o *OrchestratorAPIMock) PostLearnResult(learnupletID uuid.UUID, perfuplet 
 		return nil
 	}
 	return fmt.Errorf("[orchestrator-mock][status-update] Unexisting uplet %s", learnupletID)
+}
+
+// PostPredResult returns nil except if OrchestratorAPIMock.UnexistingUpletID is passed
+func (o *OrchestratorAPIMock) PostPredResult(predupletID uuid.UUID, preddone Preddone) error {
+	if predupletID.String() != o.UnexistingUplet {
+		log.Printf("[orchestrator-mock] Received pred result for pred-uplet %s: \n %+v", predupletID, preddone)
+		return nil
+	}
+	return fmt.Errorf("[orchestrator-mock][status-update] Unexisting uplet %s", predupletID)
 }

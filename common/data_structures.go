@@ -84,16 +84,16 @@ type Checkable interface {
 type Preduplet struct {
 	Checkable
 
-	ID                  uuid.UUID `json:"uuid"`
-	Problem             uuid.UUID `json:"problem"`
-	Workflow            uuid.UUID `json:"workflow"`
-	Model               uuid.UUID `json:"model"`
-	Data                uuid.UUID `json:"data"`
-	WorkerID            uuid.UUID `json:"worker"`
-	Status              string    `json:"status"`
-	RequestDate         time.Time `json:"timestamp_request"`
-	CompletionDate      time.Time `json:"timestamp_done"`
-	PredictionStorageID uuid.UUID `json:"prediction_storage_uuid"`
+	ID                  uuid.UUID `json:"uuid" yaml:"uuid"`
+	Problem             uuid.UUID `json:"problem" yaml:"problem"`
+	Workflow            uuid.UUID `json:"workflow" yaml:"workflow"`
+	Model               uuid.UUID `json:"model" yaml:"model"`
+	Data                uuid.UUID `json:"data" yaml:"data"`
+	WorkerID            uuid.UUID `json:"worker" yaml:"worker"`
+	Status              string    `json:"status" yaml:"status"`
+	RequestDate         int       `json:"timestamp_request" yaml:"timestamp_request"`
+	CompletionDate      int       `json:"timestamp_done" yaml:"timestamp_done"`
+	PredictionStorageID uuid.UUID `json:"prediction_storage_uuid" yaml:"prediction_storage_uuid"`
 }
 
 // Check returns nil if the preduplet is valid, an explicit error otherwise
@@ -125,25 +125,26 @@ func (u *Preduplet) Check() (err error) {
 }
 
 // LearnUplet describes a Learning task.
+// TODO: Remove maj U...
 type LearnUplet struct {
 	Checkable
 
-	ID             uuid.UUID   `json:"uuid"`
-	Problem        uuid.UUID   `json:"problem"`
-	Workflow       uuid.UUID   `json:"workflow"`
-	TrainData      []uuid.UUID `json:"train_data"`
-	TestData       []uuid.UUID `json:"test_data"`
-	Algo           uuid.UUID   `json:"algo"`
-	ModelStart     uuid.UUID   `json:"model_start"`
-	ModelEnd       uuid.UUID   `json:"model_end"`
-	Rank           int         `json:"rank"`
-	WorkerID       uuid.UUID   `json:"worker"` // @camillemarini: I didn't get the purpose of this field
-	Status         string      `json:"status"`
-	Perf           float64     `json:"perf"`
-	TrainPerf      float64     `json:"train_perf"`
-	TestPerf       float64     `json:"test_perf"`
-	RequestDate    time.Time   `json:"timestamp_request"`
-	CompletionDate time.Time   `json:"timestamp_done"`
+	ID             uuid.UUID   `json:"uuid" yaml:"uuid"`
+	Problem        uuid.UUID   `json:"problem" yaml: "problem"`
+	Workflow       uuid.UUID   `json:"workflow" yaml:"workflow"`
+	TrainData      []uuid.UUID `json:"train_data" yaml:"train_data"`
+	TestData       []uuid.UUID `json:"test_data" yaml:"test_data"`
+	Algo           uuid.UUID   `json:"algo" yaml:"algo"`
+	ModelStart     uuid.UUID   `json:"model_start" yaml:"model_start"`
+	ModelEnd       uuid.UUID   `json:"model_end" yaml:"model_end"`
+	Rank           int         `json:"rank" yaml:"rank"`
+	WorkerID       uuid.UUID   `json:"worker" yaml:"worker"` // @camillemarini: I didn't get the purpose of this field
+	Status         string      `json:"status" yaml:"status"`
+	Perf           float64     `json:"perf" yaml:"perf"`
+	TrainPerf      float64     `json:"train_perf" yaml:"train_perf"`
+	TestPerf       float64     `json:"test_perf" yaml:"test_perf"`
+	RequestDate    int         `json:"timestamp_request" yaml:"timestamp_request"`
+	CompletionDate int         `json:"timestamp_done" yaml:"timestamp_done"`
 }
 
 // Check returns nil if the learnuplet is valid, an explicit error otherwise
