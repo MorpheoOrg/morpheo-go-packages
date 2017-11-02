@@ -49,21 +49,21 @@ const (
 	ViciousDevilUUID = "2cd41d08-ef54-4a15-95a1-2e84ca72a22c"
 )
 
-// FakeBlobStore is a BlobStore implementations for tests
-type FakeBlobStore struct {
+// MOCKBlobStore is a BlobStore implementations for tests
+type MOCKBlobStore struct {
 }
 
-// NewFakeBlobStore creates a new Blobstore for tests
-func NewFakeBlobStore(dataDir string) (BlobStore, error) {
+// NewMOCKBlobStore creates a new Blobstore for tests
+func NewMOCKBlobStore(dataDir string) (BlobStore, error) {
 	if dataDir == "evil" {
 		return nil, fmt.Errorf("[fake-blobstore] Evil blobStore")
 	}
-	return &FakeBlobStore{}, nil
+	return &MOCKBlobStore{}, nil
 }
 
 // Put writes a file in the data directory (and creates necessarry sub-directories if there are
 // forward slashes in the key name)
-func (s *FakeBlobStore) Put(key string, data io.Reader, size int64) error {
+func (s *MOCKBlobStore) Put(key string, data io.Reader, size int64) error {
 	if size == NaughtySize {
 		return fmt.Errorf("[fake-blobstore] What a naughty size")
 	}
@@ -72,7 +72,7 @@ func (s *FakeBlobStore) Put(key string, data io.Reader, size int64) error {
 
 // Get returns an io.ReadCloser on the data living under the provided key. The retriever must
 // explicitely call the Close() method on it when he's done reading.
-func (s *FakeBlobStore) Get(key string) (data io.ReadCloser, err error) {
+func (s *MOCKBlobStore) Get(key string) (data io.ReadCloser, err error) {
 	// Check if uuid (end of key) is the ViciousDevilUUID
 	if strings.SplitAfter(key, "/")[1] == ViciousDevilUUID {
 		return nil, fmt.Errorf("[fake-blobstore] Runnin' With the Devil")
@@ -81,12 +81,12 @@ func (s *FakeBlobStore) Get(key string) (data io.ReadCloser, err error) {
 }
 
 // Delete remove the file
-func (s *FakeBlobStore) Delete(key string) (err error) {
+func (s *MOCKBlobStore) Delete(key string) (err error) {
 	return nil
 }
 
 // Rename renames the file
-func (s *FakeBlobStore) Rename(key string, newKey string) (err error) {
+func (s *MOCKBlobStore) Rename(key string, newKey string) (err error) {
 	return nil
 }
 
