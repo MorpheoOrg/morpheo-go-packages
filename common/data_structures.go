@@ -130,7 +130,7 @@ type LearnUplet struct {
 	Checkable
 
 	ID             uuid.UUID   `json:"uuid" yaml:"uuid"`
-	Problem        uuid.UUID   `json:"problem" yaml: "problem"`
+	Problem        uuid.UUID   `json:"problem" yaml:"problem"`
 	Workflow       uuid.UUID   `json:"workflow" yaml:"workflow"`
 	TrainData      []uuid.UUID `json:"train_data" yaml:"train_data"`
 	TestData       []uuid.UUID `json:"test_data" yaml:"test_data"`
@@ -140,9 +140,6 @@ type LearnUplet struct {
 	Rank           int         `json:"rank" yaml:"rank"`
 	WorkerID       uuid.UUID   `json:"worker" yaml:"worker"` // @camillemarini: I didn't get the purpose of this field
 	Status         string      `json:"status" yaml:"status"`
-	Perf           float64     `json:"perf" yaml:"perf"`
-	TrainPerf      float64     `json:"train_perf" yaml:"train_perf"`
-	TestPerf       float64     `json:"test_perf" yaml:"test_perf"`
 	RequestDate    int         `json:"timestamp_request" yaml:"timestamp_request"`
 	CompletionDate int         `json:"timestamp_done" yaml:"timestamp_done"`
 }
@@ -238,40 +235,36 @@ type Resource interface {
 
 // Problem defines a problem blob (should be a .tar.gz containing a Dockerfile)
 type Problem struct {
-	ID              uuid.UUID `json:"uuid" db:"uuid"`
-	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
-	Name            string    `json:"name" db:"name"`
-	Description     string    `json:"description" db:"description"`
-	Owner           uuid.UUID `json:"owner" db:"owner"`
+	ID              uuid.UUID `json:"uuid" yaml:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" yaml:"timestamp_upload" db:"timestamp_upload"`
+	Name            string    `json:"name" yaml:"name" db:"name"`
+	Description     string    `json:"description" yaml:"description" db:"description"`
 }
 
 // Algo defines an algorithm blob (should be a .tar.gz containing a Dockerfile)
 type Algo struct {
-	ID              uuid.UUID `json:"uuid" db:"uuid"`
-	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
-	Name            string    `json:"name" db:"name"`
-	Owner           uuid.UUID `json:"owner" db:"owner"`
+	ID              uuid.UUID `json:"uuid" yaml:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" yaml:"timestamp_upload" db:"timestamp_upload"`
+	Name            string    `json:"name" yaml:"name" db:"name"`
 }
 
 // Model defines a model blob (should be a .tar.gz of the model folder)
 type Model struct {
-	ID              uuid.UUID `json:"uuid" db:"uuid"`
-	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
-	Algo            uuid.UUID `json:"algo" db:"algo"`
-	Owner           uuid.UUID `json:"owner" db:"owner"`
+	ID              uuid.UUID `json:"uuid" yaml:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" yaml:"timestamp_upload" db:"timestamp_upload"`
+	Algo            uuid.UUID `json:"algo" yaml:"algo" db:"algo"`
 }
 
 // Data defines a data blob
 type Data struct {
-	ID              uuid.UUID `json:"uuid" db:"uuid"`
-	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
-	Owner           uuid.UUID `json:"owner" db:"owner"`
+	ID              uuid.UUID `json:"uuid" yaml:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" yaml:"timestamp_upload" db:"timestamp_upload"`
 }
 
 // Prediction defines a prediction blob
 type Prediction struct {
-	ID              uuid.UUID `json:"uuid" db:"uuid"`
-	TimestampUpload int32     `json:"timestamp_upload" db:"timestamp_upload"`
+	ID              uuid.UUID `json:"uuid" yaml:"uuid" db:"uuid"`
+	TimestampUpload int32     `json:"timestamp_upload" yaml:"timestamp_upload" db:"timestamp_upload"`
 }
 
 // NewProblem creates a problem instance
@@ -279,7 +272,6 @@ func NewProblem() *Problem {
 	problem := &Problem{
 		ID:              uuid.NewV4(),
 		TimestampUpload: int32(time.Now().Unix()),
-		Owner:           uuid.NewV4(),
 	}
 	return problem
 }
@@ -289,7 +281,6 @@ func NewAlgo() *Algo {
 	algo := &Algo{
 		ID:              uuid.NewV4(),
 		TimestampUpload: int32(time.Now().Unix()),
-		Owner:           uuid.NewV4(),
 	}
 	return algo
 }
@@ -304,7 +295,6 @@ func NewModel(id uuid.UUID, algo *Algo) *Model {
 		ID:              idModel,
 		TimestampUpload: int32(time.Now().Unix()),
 		Algo:            algo.ID,
-		Owner:           uuid.NewV4(),
 	}
 	return model
 }
@@ -314,7 +304,6 @@ func NewData() *Data {
 	data := &Data{
 		ID:              uuid.NewV4(),
 		TimestampUpload: int32(time.Now().Unix()),
-		Owner:           uuid.NewV4(),
 	}
 	return data
 }
@@ -344,8 +333,6 @@ func (p *Problem) FillResource(fields map[string]interface{}) error {
 			p.Name = v.(string)
 		case "description":
 			p.Description = v.(string)
-		case "owner":
-			p.Owner = v.(uuid.UUID)
 		default:
 			return fmt.Errorf("%s is not a valid field for problem", k)
 		}
@@ -359,17 +346,11 @@ func (p *Problem) Check() error {
 	if uuid.Equal(uuid.Nil, p.ID) {
 		return fmt.Errorf("'UUID' unset")
 	}
-	if uuid.Equal(uuid.Nil, p.Owner) {
-		return fmt.Errorf("'Owner' unset")
-	}
 	if p.Name == "" {
 		return fmt.Errorf("'Name' unset")
 	}
 	if p.Description == "" {
 		return fmt.Errorf("'Description' unset")
-	}
-	if uuid.Equal(uuid.Nil, p.Owner) {
-		return fmt.Errorf("'Owner' unset")
 	}
 	if p.TimestampUpload <= 0 {
 		return fmt.Errorf("'Timestamp_upload' unset")
@@ -390,8 +371,6 @@ func (a *Algo) FillResource(fields map[string]interface{}) error {
 			a.ID = v.(uuid.UUID)
 		case "name":
 			a.Name = v.(string)
-		case "owner":
-			a.Owner = v.(uuid.UUID)
 		default:
 			return fmt.Errorf("%s is not a valid field for algo", k)
 		}
@@ -407,9 +386,6 @@ func (a *Algo) Check() error {
 	}
 	if a.Name == "" {
 		return fmt.Errorf("'Name' unset")
-	}
-	if uuid.Equal(uuid.Nil, a.Owner) {
-		return fmt.Errorf("'Owner' unset")
 	}
 	if a.TimestampUpload <= 0 {
 		return fmt.Errorf("'Timestamp_upload' unset")
@@ -429,8 +405,6 @@ func (d *Data) FillResource(fields map[string]interface{}) error {
 		switch k {
 		case "uuid":
 			d.ID = v.(uuid.UUID) // TODO: handle errors with type assertion...
-		case "owner":
-			d.Owner = v.(uuid.UUID)
 		default:
 			return fmt.Errorf("%s is not a valid field for data", k)
 		}
@@ -444,11 +418,6 @@ func (d *Data) Check() error {
 	if uuid.Equal(uuid.Nil, d.ID) {
 		return fmt.Errorf("'UUID' unset")
 	}
-
-	if uuid.Equal(uuid.Nil, d.Owner) {
-		return fmt.Errorf("'Owner' unset")
-	}
-
 	if d.TimestampUpload <= 0 {
 		return fmt.Errorf("'Timestamp_upload' unset")
 	}
@@ -483,4 +452,31 @@ func (p *Prediction) Check() error {
 		return fmt.Errorf("'Timestamp_upload' unset")
 	}
 	return nil
+}
+
+// OrchestratorAlgo represents the postAlgo fields in Orchestrator
+type OrchestratorAlgo struct {
+	ID      uuid.UUID `json:"uuid" yaml:"uuid"`
+	Name    string    `json:"name" yaml:"name"`
+	Problem uuid.UUID `json:"problem" yaml:"problem"`
+}
+
+// OrchestratorData represents the PostData fields in Orchestrator
+type OrchestratorData struct {
+	ID       uuid.UUID   `json:"uuid" yaml:"uuid"`
+	Problems []uuid.UUID `json:"problems" yaml:"problems"`
+}
+
+// OrchestratorPrediction represents the PostPrediction fields in Orchestrator
+type OrchestratorPrediction struct {
+	Data    uuid.UUID `json:"data" yaml:"data"`
+	Problem uuid.UUID `json:"problem" yaml:"problem"`
+}
+
+// OrchestratorProblem represents the PostProblem fields in Orchestrator
+type OrchestratorProblem struct {
+	ID               uuid.UUID   `json:"uuid" yaml:"uuid"`
+	Workflow         uuid.UUID   `json:"workflow" yaml:"workflow"`
+	TestDataset      []uuid.UUID `json:"test_dataset" yaml:"test_dataset"`
+	SizeTrainDataset int         `json:"size_train_dataset" yaml:"size_train_dataset"`
 }
