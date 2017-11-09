@@ -45,11 +45,13 @@ import (
 // ContainerRuntime abstracts Docker/rkt/... it can load/unload images and run them, in a secured
 // way :)
 
+// MockRuntime implements a mock for containerRuntime
 type MockRuntime struct {
 	image       io.ReadCloser
 	containerID string
 }
 
+// NewMockRuntime creates a new mock
 func NewMockRuntime() *MockRuntime {
 	return &MockRuntime{
 		image:       ioutil.NopCloser(bytes.NewBuffer([]byte("fakeFileContent"))),
@@ -57,7 +59,7 @@ func NewMockRuntime() *MockRuntime {
 	}
 }
 
-// ImageBuildAndLoad builds an Image from a reader on a tar.gz archive containing all requirements
+// ImageBuild builds an Image from a reader on a tar.gz archive containing all requirements
 // to build the image. It returns an io.ReadCloser on the image and an error if error there is.
 func (s *MockRuntime) ImageBuild(name string, buildContext io.Reader) (image io.ReadCloser, err error) {
 	_, err = io.Copy(ioutil.Discard, buildContext)
@@ -75,7 +77,7 @@ func (s *MockRuntime) ImageUnload(name string) error {
 	return nil
 }
 
-// Runs a given command in a network isolated container
+// RunImageInUntrustedContainer runs a given command in a network isolated container
 func (s *MockRuntime) RunImageInUntrustedContainer(imageName string, args []string, mounts map[string]string, autoRemove bool) (containerID string, err error) {
 	return s.containerID, nil
 }

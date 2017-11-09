@@ -43,10 +43,12 @@ import (
 	"golang.org/x/net/context"
 )
 
+// GCBlobStore implements the interface Blobstore for Google Cloud Storage
 type GCBlobStore struct {
 	bucket *storage.BucketHandle
 }
 
+// NewGCBlobStore creates a new Google Cloud Blobstore
 func NewGCBlobStore(bucketName string) (*GCBlobStore, error) {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
@@ -59,6 +61,7 @@ func NewGCBlobStore(bucketName string) (*GCBlobStore, error) {
 	}, nil
 }
 
+// Put streams a file to GC
 func (s *GCBlobStore) Put(key string, r io.Reader, size int64) error {
 	obj := s.bucket.Object(key)
 
@@ -74,6 +77,7 @@ func (s *GCBlobStore) Put(key string, r io.Reader, size int64) error {
 	return nil
 }
 
+// Get retrieve a data with the specified uuid
 func (s *GCBlobStore) Get(key string) (io.ReadCloser, error) {
 	obj := s.bucket.Object(key)
 	r, err := obj.NewReader(context.Background())
@@ -83,6 +87,7 @@ func (s *GCBlobStore) Get(key string) (io.ReadCloser, error) {
 	return r, nil
 }
 
+// Delete deletes a data with the specified uuid
 func (s *GCBlobStore) Delete(key string) error {
 	obj := s.bucket.Object(key)
 	if err := obj.Delete(context.Background()); err != nil {
@@ -91,13 +96,14 @@ func (s *GCBlobStore) Delete(key string) error {
 	return nil
 }
 
+// Rename renames a data with the specified uuid
 func (s *GCBlobStore) Rename(key string, newKey string) error {
-	obj_src := s.bucket.Object(key)
-	obj_dest := s.bucket.Object(newKey)
-	if _, err := obj_dest.CopierFrom(obj_src).Run(context.Background()); err != nil {
+	objSrc := s.bucket.Object(key)
+	objDest := s.bucket.Object(newKey)
+	if _, err := objDest.CopierFrom(objSrc).Run(context.Background()); err != nil {
 		return fmt.Errorf("[gc-storage] Error renaming file: %s", err)
 	}
-	if err := obj_src.Delete(context.Background()); err != nil {
+	if err := objSrc.Delete(context.Background()); err != nil {
 		return fmt.Errorf("[gc-storage] Error deleting old file: %s", err)
 	}
 	return nil

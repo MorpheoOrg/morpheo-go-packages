@@ -37,7 +37,9 @@ package common
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/nsqio/go-nsq"
@@ -90,15 +92,17 @@ type ConsumerNSQ struct {
 
 	NsqConsumer          map[string]*nsq.Consumer
 	LookupUrls           []string
+	NsqdURL              string
 	QueuePollingInterval time.Duration
 	Channel              string
 	Logger               *log.Logger
 }
 
 // NewNSQConsumer instantiates ConsumerNSQ for the provided channel, using provided nsqlookupd URLs
-func NewNSQConsumer(lookupUrls []string, channel string, queuePollingInterval time.Duration, logger *log.Logger) (c *ConsumerNSQ) {
+func NewNSQConsumer(lookupUrls []string, nsqdURL string, channel string, queuePollingInterval time.Duration, logger *log.Logger) (c *ConsumerNSQ) {
 	return &ConsumerNSQ{
 		LookupUrls:           lookupUrls,
+		NsqdURL:              nsqdURL,
 		Channel:              channel,
 		QueuePollingInterval: queuePollingInterval,
 		NsqConsumer:          map[string]*nsq.Consumer{},
@@ -149,6 +153,11 @@ func (c *ConsumerNSQ) AddHandler(topic string, handler Handler, concurrency int,
 	consumer.AddConcurrentHandlers(newHandlerWrapper(handler), concurrency)
 	c.NsqConsumer[topic] = consumer
 
+	// Pre-create Topics in order to avoid "404 not found Error" in logs
+	if err := c.CreateTopic(topic); err != nil {
+		return fmt.Errorf("Error creating topic %s: %s", topic, err)
+	}
+
 	return nil
 }
 
@@ -165,11 +174,30 @@ func newHandlerWrapper(handler Handler) *handlerWrapper {
 }
 
 func (hw *handlerWrapper) HandleMessage(message *nsq.Message) (err error) {
-	log.Printf("[DEBUG] nsq-consumer received task")
+	log.Printf("[DEBUG][nsq] nsq-consumer received task")
 	err = hw.handler(message.Body)
 	// TODO: smart backoff strategy
 	// if _, fatal := err.(HandlerFatalError); fatal {
 	message.Finish()
 	// }
 	return err
+}
+
+// CreateTopic creates a topic in Nsqd, avoiding initial "404 error not found"
+func (c *ConsumerNSQ) CreateTopic(topic string) error {
+	url := fmt.Sprintf("http://%s/topic/create?topic=%s", c.NsqdURL, topic)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("[nsqd] Error creating topics POST request against %s: %s", url, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("[nsqd] Error performing result POST request against %s: %s", url, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("[nsqd] Unexpected status code (%s): result POST request against %s, \nBody: %s", resp.Status, url, string(body))
+	}
+	return nil
 }
