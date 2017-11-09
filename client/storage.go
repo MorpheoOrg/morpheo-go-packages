@@ -36,17 +36,19 @@
 package client
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/MorpheoOrg/morpheo-go-packages/common"
 	"github.com/satori/go.uuid"
@@ -279,6 +281,7 @@ func (s *StorageAPI) GetDataBlob(id uuid.UUID) (dataReader io.ReadCloser, err er
 }
 
 // PostModel returns an io.ReadCloser to a model
+// TODO: change *common.Model to common.Model, and *args order
 func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size int64) error {
 	// Check for associated Algo existence
 	if _, err := s.GetAlgo(model.Algo); err != nil {
@@ -289,11 +292,12 @@ func (s *StorageAPI) PostModel(model *common.Model, modelReader io.Reader, size 
 }
 
 // PostProblem posts a new problem to storage
-func (s *StorageAPI) PostProblem(problem *common.Problem, size int, problemReader io.Reader) error {
+func (s *StorageAPI) PostProblem(problem common.Problem, size int, problemReader io.Reader) error {
 
 	// Check that problem is valid
+	problem.TimestampUpload = int32(time.Now().Unix())
 	if err := problem.Check(); err != nil {
-		return fmt.Errorf("error checking prediction resource: %s", err)
+		return fmt.Errorf("error checking problem resource: %s", err)
 	}
 
 	// Build params
@@ -306,9 +310,27 @@ func (s *StorageAPI) PostProblem(problem *common.Problem, size int, problemReade
 	return s.postResourceMultipartBlob("problem", params, "blob", params["uuid"], problemReader)
 }
 
+// PostData posts a new data to storage
+func (s *StorageAPI) PostData(data common.Data, size int, dataReader io.Reader) error {
+	// Check that problem is valid
+	data.TimestampUpload = int32(time.Now().Unix())
+	if err := data.Check(); err != nil {
+		return fmt.Errorf("error checking data resource: %s", err)
+	}
+
+	// Build params
+	params := make(map[string]string)
+	params["uuid"] = data.ID.String()
+	params["size"] = strconv.Itoa(size)
+
+	return s.postResourceMultipartBlob("data", params, "blob", params["uuid"], dataReader)
+}
+
 // PostPrediction posts a new prediction to storage
+// TOFIX: order in PostPrediction...
 func (s *StorageAPI) PostPrediction(prediction *common.Prediction, predReader io.Reader, size int64) error {
 	// Check that prediction is valid
+	prediction.TimestampUpload = int32(time.Now().Unix())
 	if err := prediction.Check(); err != nil {
 		return fmt.Errorf("error checking prediction resource: %s", err)
 	}
@@ -321,21 +343,32 @@ func (s *StorageAPI) PostPrediction(prediction *common.Prediction, predReader io
 	return s.postResourceMultipartBlob("prediction", params, "blob", params["uuid"], predReader)
 }
 
+// PostAlgo posts a new algo to storage
+func (s *StorageAPI) PostAlgo(algo common.Algo, size int64, algoReader io.Reader) error {
+	// Check that algo is valid
+	algo.TimestampUpload = int32(time.Now().Unix())
+	if err := algo.Check(); err != nil {
+		return fmt.Errorf("error checking algo resource: %s", err)
+	}
+
+	// Build params
+	params := make(map[string]string)
+	params["uuid"] = algo.ID.String()
+	params["name"] = algo.Name
+	params["size"] = strconv.FormatInt(size, 10)
+
+	return s.postResourceMultipartBlob("algo", params, "blob", params["uuid"], algoReader)
+}
+
 // StorageAPIMock is a mock of the storage API (for tests & local dev. purposes)
 type StorageAPIMock struct {
 	EvilUUID string
-	Fixtures *common.Fixtures
 }
 
 // NewStorageAPIMock instantiates our mock of the storage API
 func NewStorageAPIMock() (*StorageAPIMock, error) {
-	fixtures, err := common.LoadFixtures()
-	if err != nil {
-		return nil, fmt.Errorf("Error loading Fixtures: ", err)
-	}
 	return &StorageAPIMock{
 		EvilUUID: "610e134a-ff45-4416-aaac-1b3398e4bba6",
-		Fixtures: fixtures,
 	}, nil
 }
 
@@ -363,11 +396,6 @@ func (s *StorageAPIMock) GetModel(id uuid.UUID) (*common.Model, error) {
 		return nil, fmt.Errorf("Model %s not found on storage", id)
 	}
 	algo := common.NewAlgo()
-	if model := s.Fixtures.Orchestrator.Preduplet[0].Model; id == model {
-		// Returns the (real) associated algorithm
-		algo.ID = s.Fixtures.Orchestrator.Learnuplet[0].Algo
-	}
-	log.Printf("[storage-mock][GetModel] Sending model with algo %s", algo.ID.String())
 	return common.NewModel(id, algo), nil
 }
 
@@ -386,7 +414,7 @@ func (s *StorageAPIMock) GetDataBlob(id uuid.UUID) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("Data blob %s not found on storage", id)
 	}
 
-	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+	return TargzedMock()
 }
 
 // GetAlgoBlob returns a fake Algo, no matter the UUID
@@ -394,14 +422,7 @@ func (s *StorageAPIMock) GetAlgoBlob(id uuid.UUID) (io.ReadCloser, error) {
 	if id.String() == s.EvilUUID {
 		return nil, fmt.Errorf("Algo blob %s not found on storage", id)
 	}
-	// Fixture returns a real algo
-	if algo := s.Fixtures.Orchestrator.Learnuplet[0].Algo; id == algo {
-		pathAlgo := filepath.Join(common.PathFixturesData["algo"], algo.String())
-		log.Printf("[storage-mock][GetProblemWorkflowBlob] Sending algo fixture from %s", pathAlgo)
-		return os.Open(pathAlgo)
-	}
-
-	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+	return TargzedMock()
 }
 
 // GetModelBlob returns a fake Model, no matter the UUID
@@ -409,13 +430,7 @@ func (s *StorageAPIMock) GetModelBlob(id uuid.UUID) (io.ReadCloser, error) {
 	if id.String() == s.EvilUUID {
 		return nil, fmt.Errorf("Model blob %s not found on storage", id)
 	}
-	// Fixture returns a real model
-	if model := s.Fixtures.Orchestrator.Preduplet[0].Model; id == model {
-		pathModel := filepath.Join(common.PathFixturesData["model"], model.String())
-		log.Printf("[storage-mock][GetProblemWorkflowBlob] Sending model fixture from %s", pathModel)
-		return os.Open(pathModel)
-	}
-	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+	return TargzedMock()
 }
 
 // GetProblemWorkflowBlob returns a fake ProblemWorkflow, no matter the UUID
@@ -423,13 +438,7 @@ func (s *StorageAPIMock) GetProblemWorkflowBlob(id uuid.UUID) (io.ReadCloser, er
 	if id.String() == s.EvilUUID {
 		return nil, fmt.Errorf("ProblemWorkflow blob %s not found on storage", id)
 	}
-	// Fixture returns a real problem
-	if workflow := s.Fixtures.Orchestrator.Learnuplet[0].Workflow; id == workflow {
-		pathProblem := filepath.Join(common.PathFixturesData["problem"], workflow.String())
-		log.Printf("[storage-mock][GetProblemWorkflowBlob] Sending problem fixture from %s", pathProblem)
-		return os.Open(pathProblem)
-	}
-	return ioutil.NopCloser(bytes.NewBufferString("problemmock")), nil
+	return TargzedMock()
 }
 
 // PostModel sends a model... to Oblivion
@@ -442,4 +451,51 @@ func (s *StorageAPIMock) PostModel(model *common.Model, modelReader io.Reader, s
 func (s *StorageAPIMock) PostPrediction(prediction *common.Prediction, predReader io.Reader, size int64) error {
 	_, err := io.Copy(ioutil.Discard, predReader)
 	return err
+}
+
+// TargzedMock create a Readcloser which can be ungzip-ed
+func TargzedMock() (io.ReadCloser, error) {
+	// Create tmp file
+	tmpPath := filepath.Join(os.TempDir(), "morpheo_mock")
+	if err := ioutil.WriteFile(tmpPath, []byte("mock"), 0777); err != nil {
+		return nil, fmt.Errorf("Error writing file: %s", err)
+	}
+	f, _ := os.Open(tmpPath)
+	defer os.Remove(tmpPath)
+
+	buf := bytes.NewBuffer([]byte(""))
+	if err := TargzFile(f, buf); err != nil {
+		return nil, fmt.Errorf("Error Targz-ing the file: %s", err)
+	}
+
+	return ioutil.NopCloser(buf), nil
+}
+
+// TargzFile tars and gzips a file and forwards it to an io.Writer
+func TargzFile(file *os.File, dest io.Writer) error {
+	// Let's wire our writer together
+	zipWriter := gzip.NewWriter(dest)
+	defer zipWriter.Close()
+	tarWriter := tar.NewWriter(zipWriter)
+	defer tarWriter.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("Error getting file info: %s", err)
+	}
+	// Let's create the header
+	header := &tar.Header{
+		Name:    stat.Name(),
+		Size:    stat.Size(),
+		Mode:    0664,
+		ModTime: stat.ModTime(),
+	}
+	// write the header to the tarball archive
+	if err = tarWriter.WriteHeader(header); err != nil {
+		return fmt.Errorf("Error writing tar header for file %s", err)
+	}
+	if _, err := io.Copy(tarWriter, file); err != nil {
+		return fmt.Errorf("Error writing file %s to tar archive", err)
+	}
+	return nil
 }
