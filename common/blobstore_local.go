@@ -61,7 +61,7 @@ func (s *LocalBlobStore) Put(key string, data io.Reader, size int64) error {
 	parent := filepath.Dir(datapath)
 	_, err := os.Stat(parent)
 	if os.IsNotExist(err) {
-		err := os.MkdirAll(parent, 0644)
+		err := os.MkdirAll(parent, 0755)
 		if err != nil {
 			return err
 		}
