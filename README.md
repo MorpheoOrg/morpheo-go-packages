@@ -8,7 +8,7 @@ algorithms as containers and data files as... files :)
 
 TL;DR
 -----
-* `client`: Golang API client for the `orchestrator` and `storage`
+* `client`: Golang API client for `storage` and a `fabric hyperledger peer`.  Important note: The fabric-sdk-go client is required to use this package, consequently the docker image running your go builds need the following libraries intalled: libtool libltdl-dev.
 * `common`: data structure definitions and common interfaces and types
   (container runtime backend, blob store backend, broker backend...). Code in
   this folder should not import any other library in the Morpheo project.

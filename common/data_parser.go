@@ -44,26 +44,30 @@ import (
 	"path/filepath"
 )
 
-// DataParser parses all the metadata from a yaml file into
-// structs and can retrieve associated data from disk
+// ===========================================================================
+// Structures
+// ===========================================================================
+
+// DataParser is used to parse all the metadata from a yaml file into structs
+// and to retrieve associated data from local disk
 type DataParser struct {
-	Orchestrator Orchestrator `yaml:"orchestrator"`
-	Storage      Storage      `yaml:"storage"`
+	Chaincode Chaincode `yaml:"chaincode"`
+	Storage   Storage   `yaml:"storage"`
 
-	PathDataFolder string
+	// pathDataFolder is the local path where data is stored
+	PathDataFolder string `yaml:"pathDataFolder"`
 }
 
-// Orchestrator holds metadata POSTable to the orchestrator
-type Orchestrator struct {
-	Algo       []OrchestratorAlgo       `yaml:"algo"`
-	Data       []OrchestratorData       `yaml:"data"`
-	Prediction []OrchestratorPrediction `yaml:"prediction"`
-	Problem    []OrchestratorProblem    `yaml:"problem"`
-	Preduplet  []Preduplet              `yaml:"preduplet"`
-	Learnuplet []LearnUplet             `yaml:"learnuplet"`
+// Chaincode describes metadata used to register items to the Chaincode
+// and to perform a prediction request
+type Chaincode struct {
+	Algo       []AlgoRegister      `yaml:"algo"`
+	Data       []DataRegister      `yaml:"data"`
+	Problem    []ProblemRegister   `yaml:"problem"`
+	Prediction []PredictionRequest `yaml:"prediction"`
 }
 
-// Storage holds metadata POSTable to storage
+// Storage describes data to post resources to storage
 type Storage struct {
 	Algo    []Algo    `yaml:"algo"`
 	Data    []Data    `yaml:"data"`
@@ -71,41 +75,66 @@ type Storage struct {
 	Problem []Problem `yaml:"problem"`
 }
 
-// NewDataParser parses all the metadata, and set the data folder path
-func NewDataParser(pathMetadataFile, pathDataFolder string) (*DataParser, error) {
-	data, err := ioutil.ReadFile(pathMetadataFile)
-	if err != nil {
-		return nil, fmt.Errorf("Error reading the metadata file %s: %s", pathMetadataFile, err)
-	}
-	rd := &DataParser{}
-	err = yaml.Unmarshal(data, rd)
-	if err != nil {
-		return nil, fmt.Errorf("Error Unmarshaling the metadata file %s: %s", pathMetadataFile, err)
-	}
-	rd.PathDataFolder = pathDataFolder
-	return rd, nil
+// Chaincode Specific Structures
+// ===========================================================================
+
+// AlgoRegister describes the fields needed to register an algo
+type AlgoRegister struct {
+	StorageAddress string   `json:"storageAddress" yaml:"storageAddress"`
+	Name           string   `json:"name" yaml:"name"`
+	ProblemKeys    []string `json:"problemKeys" yaml:"problemKeys"`
 }
 
-// GetData returns an io.Reader of the data specified
+// DataRegister describes the fields needed to register a data
+type DataRegister struct {
+	StorageAddress string   `json:"storageAddress" yaml:"storageAddress"`
+	ProblemKeys    []string `json:"problemKeys" yaml:"problemKeys"`
+}
+
+// ProblemRegister describes the fields needed to register a problem
+type ProblemRegister struct {
+	StorageAddress   string   `json:"storageAddress" yaml:"storageAddress"`
+	TestData         []string `json:"testData" yaml:"testData"`
+	SizeTrainDataset int      `json:"sizeTrainDataset" yaml:"sizeTrainDataset"`
+}
+
+// PredictionRequest describes the fields needed to request a prediction
+type PredictionRequest struct {
+	Data    string `json:"data" yaml:"data"`
+	Problem string `json:"problem" yaml:"problem"`
+}
+
+// ===========================================================================
+// Functions
+// ===========================================================================
+
+// ParseDataFromFile returns a DataParser struct holding the data in the file
+// provided
+func ParseDataFromFile(pathYAML string) (parser *DataParser, err error) {
+	data, err := ioutil.ReadFile(pathYAML)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading the yaml file %s: %s", pathYAML, err)
+	}
+	err = yaml.Unmarshal(data, &parser)
+	if err != nil {
+		return nil, fmt.Errorf("Error Unmarshaling the yaml file %s: %s", pathYAML, err)
+	}
+	return parser, nil
+}
+
+// GetData returns an io.ReaderCloser of the data specified.
+// The file will be searched under pathDataFolder/dataType/*
 func (s *DataParser) GetData(dataType, key string) (io.ReadCloser, error) {
-	path, err := FindFilePath(filepath.Join(s.PathDataFolder, dataType), key)
+	// fmt.Printf("[DEBUG] pathDataFolder: %s\n", s.PathDataFolder)
+	path, err := searchFileInFolder(key, filepath.Join(s.PathDataFolder, dataType))
 	if err != nil {
 		return nil, fmt.Errorf("[DataParser] Error searching file %s: %s", key, err)
 	}
-
 	return os.Open(path)
 }
 
-// Print displays the data to the console
-func (s *DataParser) Print() {
-	fmt.Println("\n----- Orchestrator -----")
-	fmt.Printf("\nAlgo: %+v\n", s.Orchestrator.Algo[0])
-	fmt.Printf("\nData: %+v\n", s.Orchestrator.Data[0])
-	fmt.Printf("\nPrediction: %+v\n", s.Orchestrator.Prediction[0])
-	fmt.Printf("\nProblem: %+v\n", s.Orchestrator.Problem[0])
-	fmt.Printf("\nLearnuplet: %+v\n", s.Orchestrator.Learnuplet[0])
-	fmt.Printf("\nPreduplet: %+v\n", s.Orchestrator.Preduplet[0])
-
+// PrintSample prints a data sample to the console (for test purposes)
+func (s *DataParser) PrintSample() {
 	fmt.Println("\n\n----- Storage -----")
 	fmt.Printf("\nAlgo: %+v\n", s.Storage.Algo[0])
 	fmt.Printf("\nData: %+v\n", s.Storage.Data[0])
@@ -113,8 +142,9 @@ func (s *DataParser) Print() {
 	fmt.Printf("\nProblem: %+v\n", s.Storage.Problem[0])
 }
 
-// FindFilePath search recursively for a file in a folder and return its path
-func FindFilePath(folder, filename string) (string, error) {
+// searchFileInFolder searches for the specified file in the provided folder
+// and its subdirectories, and returns the file path if successful.
+func searchFileInFolder(filename, folder string) (string, error) {
 	var pathFile string
 	err := filepath.Walk(folder, func(path string, f os.FileInfo, walkerr error) error {
 		if !f.IsDir() && filename == f.Name() {

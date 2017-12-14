@@ -53,7 +53,7 @@ const (
 
 // Compute describes Morpheo's compute API
 type Compute interface {
-	PostLearnuplet(learnuplet common.LearnUplet) error
+	PostLearnuplet(learnuplet common.Learnuplet) error
 	PostPreduplet(preduplet common.Preduplet) error
 }
 
@@ -68,7 +68,7 @@ type ComputeAPI struct {
 }
 
 // PostLearnuplet forwards a JSON-formatted learn result to the compute HTTP API
-func (s *ComputeAPI) PostLearnuplet(learnuplet common.LearnUplet) error {
+func (s *ComputeAPI) PostLearnuplet(learnuplet common.Learnuplet) error {
 	return s.postJSONData(ComputeLearnupletRoute, learnuplet)
 }
 

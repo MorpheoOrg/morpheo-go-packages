@@ -36,39 +36,35 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
-	"math/rand"
+	"strconv"
+	"strings"
+
+	// "github.com/MorpheoOrg/morpheo-go-packages/common"
 
 	"github.com/hyperledger/fabric-sdk-go/api/apitxn"
 	"github.com/hyperledger/fabric-sdk-go/def/fabapi"
 )
 
-var (
-	queryFcn  = "queryItems"
-	queryArgs = [][]byte{[]byte("algo")}
-	txFcn     = "registerItem"
-	txArgs    = [][]byte{[]byte("algo"),
-		[]byte("https://storage.morpheo.io/algo/0pa81bfc-b5f4-5ba2-b81a-b464248f02d2"),
-		[]byte(fmt.Sprintf("N U M B E R : %s", rand.Int())),
-	}
-)
+// Peer describes Morpheo Peer's API
+type Peer interface {
+	Query(queryFcn string, queryArgs []string) ([]byte, error)
+	Invoke(txFcn string, txArgs []string) (string, []byte, error)
+	RegisterItem(itemType, storageAddress string, problemKeys []string) (string, []byte, error)
+	RegisterProblem(storageAddress string, sizeTrainDataset int, testData []string) (string, []byte, error)
+	SetUpletWorker(upletKey, worker string) (string, []byte, error)
+	QueryStatusLearnuplet(status string) ([]byte, error)
+	ReportLearn(upletKey, status string, perf float64, trainPerf, testPerf map[string]float64) (string, []byte, error)
+}
 
-// Peer describes Morpheo's Peer API interface
-// type Peer interface {
-// 	UpdateUpletStatus(upletType, status string, upletID uuid.UUID, workerID uuid.UUID) error
-// 	PostLearnResult(learnupletID uuid.UUID, perfuplet Perfuplet) error
-// 	PostPredResult(predupletID uuid.UUID, preddone Preddone) error
-// 	PostAlgo(algo common.OrchestratorAlgo) error
-// 	PostData(data common.OrchestratorData) error
-// 	PostPrediction(prediction common.OrchestratorPrediction) error
-// 	PostProblem(problem common.OrchestratorProblem) error
-// 	GetLearnuplet() error
-// }
+// ============================================================================
+// Peer API: Fabric Hyperledger implementation of the Peer interface
+// ============================================================================
 
-// PeerAPI
+// PeerAPI describes the Fabric hyperledger peer implementation
 type PeerAPI struct {
-	Sdk        *fabapi.FabricSDK
+	sdk        *fabapi.FabricSDK
 	ConfigFile string
 
 	OrgID       string
@@ -76,11 +72,11 @@ type PeerAPI struct {
 	ChaincodeID string
 
 	ConnectEventHub bool
-	// ChannelConfig   string
-	// AdminUser ca.User
 }
 
+// NewPeerAPI create a new PeerAPI object
 func NewPeerAPI(configFile, orgID, channelID, chaincodeID string) (*PeerAPI, error) {
+	// Create SDK
 	sdkOptions := fabapi.Options{
 		ConfigFile: configFile,
 	}
@@ -88,8 +84,15 @@ func NewPeerAPI(configFile, orgID, channelID, chaincodeID string) (*PeerAPI, err
 	if err != nil {
 		return nil, fmt.Errorf("[peer-API] Error creating SDK: %s", err)
 	}
+	// Check that peer is available
+	chClient, err := sdk.NewChannelClient(channelID, "Admin")
+	if err != nil {
+		return nil, fmt.Errorf("[peer-api] Failed to create new channel client: %s", err)
+	}
+	chClient.Close()
+
 	return &PeerAPI{
-		Sdk:             sdk,
+		sdk:             sdk,
 		ConfigFile:      configFile,
 		OrgID:           orgID,
 		ChannelID:       channelID,
@@ -98,35 +101,141 @@ func NewPeerAPI(configFile, orgID, channelID, chaincodeID string) (*PeerAPI, err
 	}, nil
 }
 
-func (s *PeerAPI) GetAglo() error {
+// ============================================================================
+// Basic Functions: Query and Invoke
+// ============================================================================
+
+// Query performs a query on the Fabric Peer
+func (s *PeerAPI) Query(fcn string, args []string) ([]byte, error) {
 	// Create Channel Client
-	chClient, err := s.Sdk.NewChannelClient(s.ChannelID, "Admin")
+	chClient, err := s.sdk.NewChannelClient(s.ChannelID, "Admin")
 	if err != nil {
-		return fmt.Errorf("[peer-api] Failed to create new channel client: %s", err)
+		return nil, fmt.Errorf("[peer-api] Failed to create new channel client: %s", err)
 	}
 	defer chClient.Close()
 
-	// Query
-	query, err := chClient.Query(apitxn.QueryRequest{ChaincodeID: s.ChaincodeID, Fcn: queryFcn, Args: queryArgs})
-	if err != nil {
-		return fmt.Errorf("[peer-api] Failed to query funds: %s", err)
+	// Format args
+	argsBytes := [][]byte{}
+	for _, arg := range args {
+		argsBytes = append(argsBytes, []byte(arg))
 	}
 
-	log.Printf("\n\n*** 1st Query ***\n%s\n\n", query)
-
-	// Execute transaction
-	_, err = chClient.ExecuteTx(apitxn.ExecuteTxRequest{ChaincodeID: s.ChaincodeID, Fcn: txFcn, Args: txArgs})
+	// Make query
+	query, err := chClient.Query(apitxn.QueryRequest{ChaincodeID: s.ChaincodeID, Fcn: fcn, Args: argsBytes})
 	if err != nil {
-		return fmt.Errorf("[peer-api] Failed to registerItem: %s", err)
+		return nil, fmt.Errorf("[peer-api] Failed to Query (Fcn: %s, Args: %s): %s", fcn, args, err)
+	}
+	return query, nil
+}
+
+// Invoke performs a invoke on the Fabric Peer
+func (s *PeerAPI) Invoke(fcn string, args []string) (string, []byte, error) {
+	// Create Channel Client
+	chClient, err := s.sdk.NewChannelClient(s.ChannelID, "Admin")
+	if err != nil {
+		return "", nil, fmt.Errorf("[peer-api] Failed to create new channel client: %s", err)
+	}
+	defer chClient.Close()
+
+	// Format Args
+	argsBytes := [][]byte{}
+	for _, arg := range args {
+		argsBytes = append(argsBytes, []byte(arg))
 	}
 
-	// Query new value
-	newQuery, err := chClient.Query(apitxn.QueryRequest{ChaincodeID: s.ChaincodeID, Fcn: queryFcn, Args: queryArgs})
+	// Make query
+	txID, err := chClient.ExecuteTx(apitxn.ExecuteTxRequest{ChaincodeID: s.ChaincodeID, Fcn: fcn, Args: argsBytes})
 	if err != nil {
-		return fmt.Errorf("[peer-api] Failed to query funds after transaction: %s", err)
+		return "", nil, fmt.Errorf("[peer-api] Failed to Execute transaction (Fcn: %s, Args: %s): %s", fcn, args, err)
+	}
+	return txID.ID, txID.Nonce, nil
+}
+
+// ============================================================================
+// Register Functions
+// ============================================================================
+
+// RegisterItem registers an item
+func (s *PeerAPI) RegisterItem(itemType, storageAddress string, problemKeys []string) (string, []byte, error) {
+	return s.Invoke("registerItem", []string{itemType, storageAddress, strings.Join(problemKeys, ",")})
+}
+
+// RegisterProblem registers a problem
+func (s *PeerAPI) RegisterProblem(storageAddress string, sizeTrainDataset int, testData []string) (string, []byte, error) {
+	args := []string{storageAddress, strconv.Itoa(sizeTrainDataset), strings.Join(testData, ",")}
+	return s.Invoke("registerProblem", args)
+}
+
+// ============================================================================
+// Compute Functions
+// ============================================================================
+
+// QueryStatusLearnuplet queries the learnuplet by status
+func (s *PeerAPI) QueryStatusLearnuplet(status string) ([]byte, error) {
+	return s.Query("queryStatusLearnuplet", []string{status})
+}
+
+// SetUpletWorker invokes the function setUpletWorker
+func (s *PeerAPI) SetUpletWorker(upletKey, worker string) (string, []byte, error) {
+	return s.Invoke("setUpletWorker", []string{upletKey, worker})
+}
+
+// ReportLearn reports the output of a learning task
+func (s *PeerAPI) ReportLearn(upletKey, status string, perf float64, trainPerf, testPerf map[string]float64) (string, []byte, error) {
+	// Format Args
+	perfArg := strconv.FormatFloat(perf, 'e', -1, 32)
+	trainPerfArg, err := json.Marshal(trainPerf)
+	if err != nil {
+		return "", nil, fmt.Errorf("[peer-api] Failed to marshal trainPerf: %s", err)
+	}
+	testPerfArg, err := json.Marshal(testPerf)
+	if err != nil {
+		return "", nil, fmt.Errorf("[peer-api] Failed to marshal testPerf: %s", err)
 	}
 
-	log.Printf("\n\n***  2nd QueryValue after registering ***\n%s\n\n", newQuery)
+	// Execute Transaction
+	return s.Invoke("reportLearn", []string{upletKey, status, perfArg, string(trainPerfArg), string(testPerfArg)})
+}
 
-	return nil
+// ============================================================================
+// Peer MOCK
+// ============================================================================
+
+// PeerMock describes a mock implementation of Peer
+type PeerMock struct {
+}
+
+// Query performs a query
+func (s *PeerMock) Query(queryFcn string, queryArgs []string) ([]byte, error) {
+	return nil, nil
+}
+
+// Invoke performs an invoke
+func (s *PeerMock) Invoke(txFcn string, txArgs []string) (string, []byte, error) {
+	return "", nil, nil
+}
+
+// RegisterItem registers an item
+func (s *PeerMock) RegisterItem(itemType, storageAddress string, problemKeys []string) (string, []byte, error) {
+	return "", nil, nil
+}
+
+// RegisterProblem registers a problem
+func (s *PeerMock) RegisterProblem(storageAddress string, sizeTrainDataset int, testData []string) (string, []byte, error) {
+	return "", nil, nil
+}
+
+// SetUpletWorker invokes the function setUpletWorker
+func (s *PeerMock) SetUpletWorker(upletKey, worker string) (string, []byte, error) {
+	return "", nil, nil
+}
+
+// QueryStatusLearnuplet queries the learnuplet by status
+func (s *PeerMock) QueryStatusLearnuplet(status string) ([]byte, error) {
+	return nil, nil
+}
+
+// ReportLearn reports the output of a learning task
+func (s *PeerMock) ReportLearn(upletKey, status string, perf float64, trainPerf, testPerf map[string]float64) (string, []byte, error) {
+	return "", nil, nil
 }
