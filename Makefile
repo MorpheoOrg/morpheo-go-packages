@@ -33,53 +33,22 @@
 # knowledge of the CeCILL license and that you accept its terms.
 #
 
-# (Containerized) build commands
-BUILD_CONTAINER = \
-  docker run -u $(shell id -u) -it --rm \
-	  --workdir "/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-packages" \
-	  -v $${PWD}:/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-packages:ro \
-	  -v $${PWD}/vendor:/vendor/src \
-	  -e GOPATH="/go:/vendor" \
-	  -e CGO_ENABLED=0 \
-	  -e GOOS=linux
-
-DEP_CONTAINER = \
-	docker run -it --rm \
-	  --workdir "/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-morpheo" \
-	  -v $${PWD}:/usr/local/go/src/github.com/MorpheoOrg/morpheo-go-morpheo \
-		$(BUILD_CONTAINER_IMAGE)
-
-BUILD_CONTAINER_IMAGE = golang:1-onbuild
-
-GOBUILD = go build --installsuffix cgo --ldflags '-extldflags \"-static\"'
-GOTEST = go test
-
-# Targets (files & phony targets)
-TARGETS = client common
-TEST_TARGETS = $(foreach TARGET,$(TARGETS),$(TARGET)-test)
-
 # Target configuration
-.DEFAULT: all
-.PHONY: all clean vendor-clean test $(TEST_TARGETS)
-
-# Project wide targets
-test: $(TEST_TARGETS)
-clean: vendor-clean
+.PHONY: clean vendor-clean test $(TEST_TARGETS)
 
 # 1. Vendoring
 vendor: Gopkg.toml
-	@echo "Pulling dependencies with dep... in a build container too"
-	rm -rf ./vendor
-	mkdir ./vendor
-	$(DEP_CONTAINER) bash -c \
-		"go get -u github.com/golang/dep/cmd/dep && dep ensure && chown $(shell id -u):$(shell id -g) -R ./Gopkg.* ./vendor"
+	@echo "Pulling dependencies with dep..."
+	dep ensure
 
 vendor-clean:
 	@echo "Dropping the vendor folder"
 	rm -rf ./vendor
 
 # 2. Testing
-$(TEST_TARGETS): vendor
-	@echo "Running go test in $(subst -test,,$(@)) directory"
-	$(BUILD_CONTAINER) $(BUILD_CONTAINER_IMAGE) \
-    bash -c "cd $(subst -test,,$(@)) && $(GOTEST) "
+tests:
+	go test ./common
+	go test ./client
+
+# 3. Cleaning
+clean: vendor-clean

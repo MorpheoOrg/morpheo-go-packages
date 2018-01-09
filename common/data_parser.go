@@ -144,9 +144,15 @@ func (s *DataParser) PrintSample() {
 
 // searchFileInFolder searches for the specified file in the provided folder
 // and its subdirectories, and returns the file path if successful.
-func searchFileInFolder(filename, folder string) (string, error) {
-	var pathFile string
-	err := filepath.Walk(folder, func(path string, f os.FileInfo, walkerr error) error {
+func searchFileInFolder(filename, folder string) (pathFile string, err error) {
+	// Check if folder exists (important, otherwise => panic Error)
+	_, err = os.Stat(folder)
+	if err != nil {
+		return "", err
+	}
+
+	// Look for file
+	err = filepath.Walk(folder, func(path string, f os.FileInfo, walkerr error) error {
 		if !f.IsDir() && filename == f.Name() {
 			pathFile = path
 			return io.EOF
