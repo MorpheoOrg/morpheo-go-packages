@@ -31,4 +31,4 @@
 
 [[constraint]]
   name = "github.com/hyperledger/fabric-sdk-go"
-  branch = "master"
+  revision = "9dad8aeef1cad811762f1c476eb6fdf459836471"
