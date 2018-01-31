@@ -81,14 +81,15 @@ type Storage struct {
 // AlgoRegister describes the fields needed to register an algo
 type AlgoRegister struct {
 	StorageAddress string   `json:"storageAddress" yaml:"storageAddress"`
-	Name           string   `json:"name" yaml:"name"`
 	ProblemKeys    []string `json:"problemKeys" yaml:"problemKeys"`
+	Name           string   `json:"name" yaml:"name"`
 }
 
 // DataRegister describes the fields needed to register a data
 type DataRegister struct {
 	StorageAddress string   `json:"storageAddress" yaml:"storageAddress"`
 	ProblemKeys    []string `json:"problemKeys" yaml:"problemKeys"`
+	Name           string   `json:"name" yaml:"name"`
 }
 
 // ProblemRegister describes the fields needed to register a problem

@@ -51,7 +51,8 @@ import (
 type Peer interface {
 	Query(queryFcn string, queryArgs []string) ([]byte, error)
 	Invoke(txFcn string, txArgs []string) (string, []byte, error)
-	RegisterItem(itemType, storageAddress string, problemKeys []string) (string, []byte, error)
+
+	RegisterItem(itemType, storageAddress string, problemKeys []string, itemName string) (string, []byte, error)
 	RegisterProblem(storageAddress string, sizeTrainDataset int, testData []string) (string, []byte, error)
 	SetUpletWorker(upletKey, worker string) (string, []byte, error)
 	QueryStatusLearnuplet(status string) ([]byte, error)
@@ -156,8 +157,8 @@ func (s *PeerAPI) Invoke(fcn string, args []string) (string, []byte, error) {
 // ============================================================================
 
 // RegisterItem registers an item
-func (s *PeerAPI) RegisterItem(itemType, storageAddress string, problemKeys []string) (string, []byte, error) {
-	return s.Invoke("registerItem", []string{itemType, storageAddress, strings.Join(problemKeys, ",")})
+func (s *PeerAPI) RegisterItem(itemType, storageAddress string, problemKeys []string, itemName string) (string, []byte, error) {
+	return s.Invoke("registerItem", []string{itemType, storageAddress, strings.Join(problemKeys, ","), itemName})
 }
 
 // RegisterProblem registers a problem
@@ -216,7 +217,7 @@ func (s *PeerMock) Invoke(txFcn string, txArgs []string) (string, []byte, error)
 }
 
 // RegisterItem registers an item
-func (s *PeerMock) RegisterItem(itemType, storageAddress string, problemKeys []string) (string, []byte, error) {
+func (s *PeerMock) RegisterItem(itemType, storageAddress string, problemKeys []string, itemName string) (string, []byte, error) {
 	return "", nil, nil
 }
 
